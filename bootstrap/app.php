@@ -15,11 +15,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // ✅ Sanctum stateful API (replaces the old Kernel.php approach)
+        // ✅ Sanctum stateful API
         $middleware->statefulApi();
 
         // ✅ Force JSON on all API requests
         $middleware->prependToGroup('api', \App\Http\Middleware\ForceJsonResponse::class);
+
+        // ✅ Register admin middleware alias
+        // This allows you to use ->middleware('admin') in your routes
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // ✅ Unauthenticated → JSON
