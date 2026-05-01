@@ -3,113 +3,65 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
-use App\Models\User;
+use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    /**
-     * Register a new user.
-     */
+    public function __construct(
+        protected AuthService $authService
+    ) {}
+
     public function register(RegisterRequest $request): JsonResponse
     {
-        $validated = $request->validated();
-
-        // Create user — password auto-hashed via 'hashed' cast
-        $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => $validated['password'],
-        ]);
-
-        // Auto-create player profile
-        $user->playerProfile()->create([
-            'current_level' => 1,
-            'total_xp'      => 0,
-            'streak'        => 0,
-        ]);
-
-        // Generate token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        // Load relationship for response
-        $user->load('playerProfile');
+        $result = $this->authService->register($request->validated());
 
         return response()->json([
             'success'    => true,
             'message'    => 'Registration successful.',
             'data'       => [
-                'user'       => new UserResource($user),
-                'token'      => $token,
+                'user'       => new UserResource($result['user']),
+                'token'      => $result['token'],
                 'token_type' => 'Bearer',
             ],
         ], 201);
     }
 
-    /**
-     * Login an existing user.
-     */
     public function login(LoginRequest $request): JsonResponse
     {
-        $validated = $request->validated();
+        $result = $this->authService->login($request->validated());
 
-        // Attempt authentication
-        if (!Auth::attempt([
-            'email'    => $validated['email'],
-            'password' => $validated['password'],
-        ])) {
+        if ($result['status'] === 'invalid') {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password.',
             ], 401);
         }
 
-        /** @var User $user */
-        $user = Auth::user();
-
-        // Check if account is active
-        if (!$user->is_active) {
-            Auth::guard('web')->logout();
-
+        if ($result['status'] === 'inactive') {
             return response()->json([
                 'success' => false,
                 'message' => 'Your account has been deactivated. Please contact support.',
             ], 403);
         }
 
-        // Update last active
-        $user->update(['last_active_at' => now()]);
-
-        // Generate token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        // Load relationship
-        $user->load('playerProfile');
-
         return response()->json([
             'success'    => true,
             'message'    => 'Login successful.',
             'data'       => [
-                'user'       => new UserResource($user),
-                'token'      => $token,
+                'user'       => new UserResource($result['user']),
+                'token'      => $result['token'],
                 'token_type' => 'Bearer',
             ],
         ], 200);
     }
 
-    /**
-     * Logout (revoke current token).
-     */
     public function logout(): JsonResponse
     {
-        /** @var User $user */
-        $user = Auth::user();
-        $user->currentAccessToken()->delete();
+        $this->authService->logout(auth()->user());
 
         return response()->json([
             'success' => true,
@@ -117,14 +69,9 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Get authenticated user profile.
-     */
     public function me(): JsonResponse
     {
-        /** @var User $user */
-        $user = Auth::user();
-        $user->load('playerProfile');
+        $user = $this->authService->me(auth()->user());
 
         return response()->json([
             'success' => true,

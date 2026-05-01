@@ -8,17 +8,18 @@ use App\Http\Requests\Sign\UpdateSignRequest;
 use App\Http\Resources\SignResource;
 use App\Models\Level;
 use App\Models\Sign;
+use App\Services\SignService;
 use Illuminate\Http\JsonResponse;
 
 class SignController extends Controller
 {
-    /**
-     * GET /api/levels/{level}/signs
-     * Public: Get all signs for a specific level.
-     */
+    public function __construct(
+        protected SignService $signService
+    ) {}
+
     public function index(Level $level): JsonResponse
     {
-        $signs = $level->signs()->orderBy('id')->get();
+        $signs = $this->signService->getSignsByLevel($level);
 
         return response()->json([
             'success' => true,
@@ -26,13 +27,9 @@ class SignController extends Controller
         ], 200);
     }
 
-    /**
-     * GET /api/signs/{sign}
-     * Public: Show a single sign.
-     */
     public function show(Sign $sign): JsonResponse
     {
-        $sign->load('level');
+        $sign = $this->signService->getSignDetail($sign);
 
         return response()->json([
             'success' => true,
@@ -40,14 +37,9 @@ class SignController extends Controller
         ], 200);
     }
 
-    /**
-     * POST /api/admin/signs
-     * Admin only: Create a new sign.
-     */
     public function store(StoreSignRequest $request): JsonResponse
     {
-        $sign = Sign::create($request->validated());
-        $sign->load('level');
+        $sign = $this->signService->createSign($request->validated());
 
         return response()->json([
             'success' => true,
@@ -56,14 +48,9 @@ class SignController extends Controller
         ], 201);
     }
 
-    /**
-     * PUT /api/admin/signs/{sign}
-     * Admin only: Update a sign.
-     */
     public function update(UpdateSignRequest $request, Sign $sign): JsonResponse
     {
-        $sign->update($request->validated());
-        $sign->load('level');
+        $sign = $this->signService->updateSign($sign, $request->validated());
 
         return response()->json([
             'success' => true,
@@ -72,13 +59,9 @@ class SignController extends Controller
         ], 200);
     }
 
-    /**
-     * DELETE /api/admin/signs/{sign}
-     * Admin only: Delete a sign.
-     */
     public function destroy(Sign $sign): JsonResponse
     {
-        $sign->delete();
+        $this->signService->deleteSign($sign);
 
         return response()->json([
             'success' => true,
