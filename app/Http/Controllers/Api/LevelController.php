@@ -7,19 +7,18 @@ use App\Http\Requests\Level\StoreLevelRequest;
 use App\Http\Requests\Level\UpdateLevelRequest;
 use App\Http\Resources\LevelResource;
 use App\Models\Level;
+use App\Services\LevelService;
 use Illuminate\Http\JsonResponse;
 
 class LevelController extends Controller
 {
-    /**
-     * GET /api/levels
-     * Public: List all levels ordered by 'order' field.
-     */
+    public function __construct(
+        protected LevelService $levelService
+    ) {}
+
     public function index(): JsonResponse
     {
-        $levels = Level::withCount(['signs', 'quests'])
-                       ->orderBy('order')
-                       ->get();
+        $levels = $this->levelService->getAllLevels();
 
         return response()->json([
             'success' => true,
@@ -27,14 +26,9 @@ class LevelController extends Controller
         ], 200);
     }
 
-    /**
-     * GET /api/levels/{level}
-     * Public: Show a single level with its signs and quests.
-     */
     public function show(Level $level): JsonResponse
     {
-        $level->load(['signs', 'quests']);
-        $level->loadCount(['signs', 'quests']);
+        $level = $this->levelService->getLevelDetail($level);
 
         return response()->json([
             'success' => true,
@@ -42,13 +36,9 @@ class LevelController extends Controller
         ], 200);
     }
 
-    /**
-     * POST /api/admin/levels
-     * Admin only: Create a new level.
-     */
     public function store(StoreLevelRequest $request): JsonResponse
     {
-        $level = Level::create($request->validated());
+        $level = $this->levelService->createLevel($request->validated());
 
         return response()->json([
             'success' => true,
@@ -57,13 +47,9 @@ class LevelController extends Controller
         ], 201);
     }
 
-    /**
-     * PUT /api/admin/levels/{level}
-     * Admin only: Update a level.
-     */
     public function update(UpdateLevelRequest $request, Level $level): JsonResponse
     {
-        $level->update($request->validated());
+        $level = $this->levelService->updateLevel($level, $request->validated());
 
         return response()->json([
             'success' => true,
@@ -72,13 +58,9 @@ class LevelController extends Controller
         ], 200);
     }
 
-    /**
-     * DELETE /api/admin/levels/{level}
-     * Admin only: Delete a level.
-     */
     public function destroy(Level $level): JsonResponse
     {
-        $level->delete();
+        $this->levelService->deleteLevel($level);
 
         return response()->json([
             'success' => true,

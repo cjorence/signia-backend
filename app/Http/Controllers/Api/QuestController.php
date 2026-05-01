@@ -8,17 +8,18 @@ use App\Http\Requests\Quest\UpdateQuestRequest;
 use App\Http\Resources\QuestResource;
 use App\Models\Level;
 use App\Models\Quest;
+use App\Services\QuestService;
 use Illuminate\Http\JsonResponse;
 
 class QuestController extends Controller
 {
-    /**
-     * GET /api/levels/{level}/quests
-     * Public: Get all quests for a specific level.
-     */
+    public function __construct(
+        protected QuestService $questService
+    ) {}
+
     public function index(Level $level): JsonResponse
     {
-        $quests = $level->quests()->orderBy('id')->get();
+        $quests = $this->questService->getQuestsByLevel($level);
 
         return response()->json([
             'success' => true,
@@ -26,13 +27,9 @@ class QuestController extends Controller
         ], 200);
     }
 
-    /**
-     * GET /api/quests/{quest}
-     * Public: Show a single quest.
-     */
     public function show(Quest $quest): JsonResponse
     {
-        $quest->load('level');
+        $quest = $this->questService->getQuestDetail($quest);
 
         return response()->json([
             'success' => true,
@@ -40,14 +37,9 @@ class QuestController extends Controller
         ], 200);
     }
 
-    /**
-     * POST /api/admin/quests
-     * Admin only: Create a new quest.
-     */
     public function store(StoreQuestRequest $request): JsonResponse
     {
-        $quest = Quest::create($request->validated());
-        $quest->load('level');
+        $quest = $this->questService->createQuest($request->validated());
 
         return response()->json([
             'success' => true,
@@ -56,14 +48,9 @@ class QuestController extends Controller
         ], 201);
     }
 
-    /**
-     * PUT /api/admin/quests/{quest}
-     * Admin only: Update a quest.
-     */
     public function update(UpdateQuestRequest $request, Quest $quest): JsonResponse
     {
-        $quest->update($request->validated());
-        $quest->load('level');
+        $quest = $this->questService->updateQuest($quest, $request->validated());
 
         return response()->json([
             'success' => true,
@@ -72,13 +59,9 @@ class QuestController extends Controller
         ], 200);
     }
 
-    /**
-     * DELETE /api/admin/quests/{quest}
-     * Admin only: Delete a quest.
-     */
     public function destroy(Quest $quest): JsonResponse
     {
-        $quest->delete();
+        $this->questService->deleteQuest($quest);
 
         return response()->json([
             'success' => true,
