@@ -63,6 +63,20 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+        public function progress(): HasMany
+    {
+        return $this->hasMany(Progress::class);
+    }
+
+    public function gestureLogs(): HasMany
+    {
+        return $this->hasMany(GestureLog::class);
+    }
+
+    public function scores(): HasMany
+    {
+        return $this->hasMany(Score::class);
+    }
 
     // ========================
     // HELPERS
