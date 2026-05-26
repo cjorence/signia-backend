@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\ForceJsonResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,10 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Your BaseService is now handling the tokens correctly.
 
         // ✅ Keep your other existing logic
-        $middleware->prependToGroup('api', \App\Http\Middleware\ForceJsonResponse::class);
+        $middleware->prependToGroup('api', ForceJsonResponse::class);
 
         $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'admin' => EnsureUserIsAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

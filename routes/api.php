@@ -1,12 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\LevelController;
-use App\Http\Controllers\Api\SignController;
-use App\Http\Controllers\Api\QuestController;
-use App\Http\Controllers\Api\UserQuestController;
-use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\GestureController;
+use App\Http\Controllers\Api\LevelController;
+use App\Http\Controllers\Api\ProgressController;
+use App\Http\Controllers\Api\QuestController;
+use App\Http\Controllers\Api\QuizController;
+use App\Http\Controllers\Api\SignController;
+use App\Http\Controllers\Api\UserQuestController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,8 +25,10 @@ Route::get('/levels', [LevelController::class, 'index']);
 Route::get('/levels/{level}', [LevelController::class, 'show']);
 Route::get('/levels/{level}/signs', [SignController::class, 'index']);
 Route::get('/levels/{level}/quests', [QuestController::class, 'index']);
+Route::get('/levels/{level}/quizzes', [QuizController::class, 'indexByLevel']);
 Route::get('/signs/{sign}', [SignController::class, 'show']);
 Route::get('/quests/{quest}', [QuestController::class, 'show']);
+Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -46,7 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/quests', [UserQuestController::class, 'updateStatus']);
     });
 
-        // Progress tracking (user-only, scoped via Auth::id() in service)
+    // Progress tracking (user-only, scoped via Auth::id() in service)
     Route::prefix('user/progress')->group(function () {
         Route::get('/', [ProgressController::class, 'index']);
         Route::get('/level/{levelId}', [ProgressController::class, 'byLevel']);
@@ -54,12 +57,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [ProgressController::class, 'update']);
     });
 
-        // Gesture logging (user-only, scoped via Auth::id() in service)
+    // Gesture logging (user-only, scoped via Auth::id() in service)
     Route::prefix('user/gestures')->group(function () {
         Route::get('/', [GestureController::class, 'index']);
         Route::get('/accuracy', [GestureController::class, 'accuracy']);
         Route::post('/', [GestureController::class, 'store']);
     });
+
+    Route::post('/user/quizzes/{quiz}/submit', [QuizController::class, 'submit']);
 
     /*
     |----------------------------------------------------------------------
@@ -82,5 +87,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/quests', [QuestController::class, 'store']);
         Route::put('/quests/{quest}', [QuestController::class, 'update']);
         Route::delete('/quests/{quest}', [QuestController::class, 'destroy']);
+
+        // Quizzes
+        Route::post('/quizzes', [QuizController::class, 'store']);
+        Route::put('/quizzes/{quiz}', [QuizController::class, 'update']);
+        Route::delete('/quizzes/{quiz}', [QuizController::class, 'destroy']);
+
+        // Quiz questions
+        Route::post('/quizzes/{quiz}/questions', [QuizController::class, 'addQuestion']);
+        Route::put('/questions/{question}', [QuizController::class, 'updateQuestion']);
+        Route::delete('/questions/{question}', [QuizController::class, 'deleteQuestion']);
+
+        // Question choices
+        Route::post('/questions/{question}/choices', [QuizController::class, 'addChoice']);
+        Route::put('/choices/{choice}', [QuizController::class, 'updateChoice']);
+        Route::delete('/choices/{choice}', [QuizController::class, 'deleteChoice']);
     });
 });

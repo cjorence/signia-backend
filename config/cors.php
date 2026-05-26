@@ -17,11 +17,11 @@ return [
 
     // Added 'sanctum/csrf-cookie' and 'login' to ensure these paths are not blocked
     'paths' => [
-        'api/*', 
-        'sanctum/csrf-cookie', 
-        'login', 
+        'api/*',
+        'sanctum/csrf-cookie',
+        'login',
         'logout',
-        'auth/*'
+        'auth/*',
     ],
 
     'allowed_methods' => ['*'],

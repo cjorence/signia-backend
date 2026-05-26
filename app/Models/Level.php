@@ -20,7 +20,7 @@ class Level extends Model
     protected function casts(): array
     {
         return [
-            'order'       => 'integer',
+            'order' => 'integer',
             'required_xp' => 'integer',
         ];
     }
@@ -37,5 +37,10 @@ class Level extends Model
     public function quests(): HasMany
     {
         return $this->hasMany(Quest::class);
+    }
+
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class);
     }
 }

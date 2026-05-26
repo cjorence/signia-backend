@@ -7,32 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Sign extends Model
+class Quiz extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'level_id',
-        'name',
-        'fsl_name',
+        'title',
         'description',
-        'image_url',
-        'video_url',
-        'model_label',
-        'difficulty',
-        'xp_reward',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'xp_reward' => 'integer',
+            'is_active' => 'boolean',
         ];
     }
-
-    // ========================
-    // RELATIONSHIPS
-    // ========================
 
     public function level(): BelongsTo
     {
@@ -42,5 +33,10 @@ class Sign extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(Question::class);
+    }
+
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class);
     }
 }
