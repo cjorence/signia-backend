@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Choice\StoreChoiceRequest;
 use App\Http\Requests\Question\StoreQuestionRequest;
-use App\Http\RequestsQuiz\StoreQuizRequest;
+use App\Http\Requests\Quiz\StoreQuizRequest;
 use App\Http\Requests\Quiz\SubmitQuizRequest;
 use App\Http\Resources\ChoiceResource;
 use App\Http\Resources\QuestionResource;

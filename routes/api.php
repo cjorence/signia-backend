@@ -1,5 +1,5 @@
 <?php
-
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GestureController;
 use App\Http\Controllers\Api\LevelController;
@@ -102,5 +102,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/questions/{question}/choices', [QuizController::class, 'addChoice']);
         Route::put('/choices/{choice}', [QuizController::class, 'updateChoice']);
         Route::delete('/choices/{choice}', [QuizController::class, 'deleteChoice']);
+
+        // Admin dashboard
+        Route::get('/analytics', [AdminController::class, 'analytics']);
+        Route::get('/logs', [AdminController::class, 'logs']);
+
+        // User management
+        Route::get('/users', [AdminController::class, 'users']);
+        Route::get('/users/{user}', [AdminController::class, 'showUser']);
+        Route::patch('/users/{user}/activate', [AdminController::class, 'activateUser']);
+        Route::patch('/users/{user}/deactivate', [AdminController::class, 'deactivateUser']);
     });
 });
