@@ -83,6 +83,18 @@ class User extends Authenticatable
         return $this->hasMany(QuizAttempt::class);
     }
 
+        public function userAchievements(): HasMany
+    {
+        return $this->hasMany(UserAchievement::class);
+    }
+
+    public function achievements(): BelongsToMany
+    {
+        return $this->belongsToMany(Achievement::class, 'user_achievements')
+            ->withPivot('unlocked_at')
+            ->withTimestamps();
+    }
+    
     // ========================
     // HELPERS
     // ========================

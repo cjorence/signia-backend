@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Achievement;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -17,9 +18,20 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        User::firstOrCreate(
+    ['email' => 'test@example.com'],
+    [
+        'name' => 'Test User',
+        'password' => 'password',
+        'role' => 'user',
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]
+    );
+
+     $this->call([
+            AchievementSeeder::class,
         ]);
+        
     }
 }

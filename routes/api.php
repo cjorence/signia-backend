@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\QuestController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\SignController;
 use App\Http\Controllers\Api\UserQuestController;
+use App\Http\Controllers\Api\AchievementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,6 +30,7 @@ Route::get('/levels/{level}/quizzes', [QuizController::class, 'indexByLevel']);
 Route::get('/signs/{sign}', [SignController::class, 'show']);
 Route::get('/quests/{quest}', [QuestController::class, 'show']);
 Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);
+Route::get('/achievements', [AchievementController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
@@ -65,6 +67,11 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/user/quizzes/{quiz}/submit', [QuizController::class, 'submit']);
+
+    Route::prefix('user/achievements')->group(function () {
+        Route::get('/', [AchievementController::class, 'userAchievements']);
+        Route::post('/check', [AchievementController::class, 'check']);
+    });
 
     /*
     |----------------------------------------------------------------------
