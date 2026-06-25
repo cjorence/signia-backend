@@ -7,6 +7,7 @@ use App\Models\Level;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -92,52 +93,69 @@ class QuizService
     }
 
     public function submitQuiz(int $userId, Quiz $quiz, array $data): array
-    {
-        if (! $quiz->is_active) {
+{
+    if (! $quiz->is_active) {
+        throw ValidationException::withMessages([
+            'quiz' => 'Inactive quizzes cannot be submitted.',
+        ]);
+    }
+
+    $user = User::findOrFail($userId);
+
+    $this->heartService->ensureCanAttempt($user);
+
+    $quiz->load('questions.choices');
+    $questions = $quiz->questions->keyBy('id');
+    $answers = collect($data['answers']);
+
+    if ($answers->pluck('question_id')->duplicates()->isNotEmpty()) {
+        throw ValidationException::withMessages([
+            'answers' => 'Each question can only be answered once.',
+        ]);
+    }
+
+    $answers->each(function (array $answer) use ($questions): void {
+        if (! $questions->has((int) $answer['question_id'])) {
             throw ValidationException::withMessages([
-                'quiz' => 'Inactive quizzes cannot be submitted.',
+                'answers' => 'One or more submitted questions do not belong to this quiz.',
+            ]);
+        }
+    });
+
+    $score = $answers->reduce(function (int $score, array $answer) use ($questions): int {
+        $question = $questions->get((int) $answer['question_id']);
+
+        return $this->isCorrectAnswer($question, $answer['answer'])
+            ? $score + 1
+            : $score;
+    }, 0);
+
+    $wrongAnswers = max($answers->count() - $score, 0);
+
+    $attempt = DB::transaction(function () use ($user, $quiz, $score, $wrongAnswers, $questions) {
+        if ($wrongAnswers > 0) {
+            $this->heartService->deduct($user, $wrongAnswers, 'wrong_quiz_answer', [
+                'quiz_id' => $quiz->id,
+                'score' => $score,
+                'total_questions' => $questions->count(),
             ]);
         }
 
-        $quiz->load('questions.choices');
-        $questions = $quiz->questions->keyBy('id');
-        $answers = collect($data['answers']);
-
-        if ($answers->pluck('question_id')->duplicates()->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'answers' => 'Each question can only be answered once.',
-            ]);
-        }
-
-        $answers->each(function (array $answer) use ($questions): void {
-            if (! $questions->has((int) $answer['question_id'])) {
-                throw ValidationException::withMessages([
-                    'answers' => 'One or more submitted questions do not belong to this quiz.',
-                ]);
-            }
-        });
-
-        $score = $answers->reduce(function (int $score, array $answer) use ($questions): int {
-            $question = $questions->get((int) $answer['question_id']);
-
-            return $this->isCorrectAnswer($question, $answer['answer'])
-                ? $score + 1
-                : $score;
-        }, 0);
-
-        $attempt = DB::transaction(fn () => QuizAttempt::create([
-            'user_id' => $userId,
+        return QuizAttempt::create([
+            'user_id' => $user->id,
             'quiz_id' => $quiz->id,
             'score' => $score,
             'completed_at' => now(),
-        ]));
+        ]);
+    });
 
-        return [
-            'attempt' => $attempt->load('quiz'),
-            'score' => $score,
-            'total_questions' => $questions->count(),
-        ];
-    }
+    return [
+        'attempt' => $attempt->load('quiz'),
+        'score' => $score,
+        'total_questions' => $questions->count(),
+        'wrong_answers' => $wrongAnswers,
+    ];
+}
 
     protected function isCorrectAnswer(Question $question, mixed $answer): bool
     {
@@ -155,4 +173,8 @@ class QuizService
 
         return strtolower(trim((string) $answer)) === strtolower(trim($question->correct_answer));
     }
+
+    public function __construct(
+        protected HeartService $heartService
+    ) {}
 }

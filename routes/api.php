@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\SignController;
 use App\Http\Controllers\Api\UserQuestController;
 use App\Http\Controllers\Api\AchievementController;
+use App\Http\Controllers\Api\HeartController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PurchaseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,6 +23,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
+Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
 
 // Public game data (read-only)
 Route::get('/levels', [LevelController::class, 'index']);
@@ -73,6 +77,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/check', [AchievementController::class, 'check']);
     });
 
+    Route::prefix('user')->group(function () {
+        Route::get('/hearts', [HeartController::class, 'status']);
+        Route::get('/hearts/transactions', [HeartController::class, 'transactions']);
+
+        Route::post('/purchases', [PurchaseController::class, 'store']);
+        Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
+        Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+    });
+
     /*
     |----------------------------------------------------------------------
     | Admin Routes (Admin Only)
@@ -119,5 +132,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users/{user}', [AdminController::class, 'showUser']);
         Route::patch('/users/{user}/activate', [AdminController::class, 'activateUser']);
         Route::patch('/users/{user}/deactivate', [AdminController::class, 'deactivateUser']);
+
+        Route::get('/purchases', [PurchaseController::class, 'adminPurchases']);
+        Route::get('/revenue/summary', [PurchaseController::class, 'revenueSummary']);
+        Route::post('/purchases/{purchase}/mark-paid', [PurchaseController::class, 'markPaid']);
+
+        Route::get('/heart-transactions', [HeartController::class, 'adminTransactions']);
+        Route::post('/users/{user}/hearts/grant', [HeartController::class, 'grant']);
     });
 });

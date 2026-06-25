@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GestureLog;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -14,17 +15,22 @@ class GestureService
     private const CORRECTNESS_THRESHOLD = 70.00;
 
     public function __construct(
-        protected ProgressService $progressService
+        protected ProgressService $progressService,
+        protected HeartService $heartService
     ) {}
 
     /**
      * Compare expected vs predicted, calculate correctness, store log,
-     * and trigger progress update.
+     * deduct heart if incorrect, and trigger progress update.
      */
     public function storeGesture(int $userId, array $data): array
     {
+        $user = User::findOrFail($userId);
+
+        $this->heartService->ensureCanAttempt($user);
+
         // Compare expected vs predicted (case-insensitive)
-        $expected  = strtolower(trim($data['expected_sign']));
+        $expected = strtolower(trim($data['expected_sign']));
         $predicted = strtolower(trim($data['predicted_sign']));
         $confidence = (float) $data['confidence'];
 
@@ -33,22 +39,32 @@ class GestureService
         // 2. Confidence must meet threshold
         $isCorrect = ($expected === $predicted) && ($confidence >= self::CORRECTNESS_THRESHOLD);
 
-        // Persist log + progress update atomically
-        $result = DB::transaction(function () use ($userId, $data, $isCorrect, $confidence) {
+        // Persist log + heart deduction + progress update atomically
+        $result = DB::transaction(function () use ($user, $userId, $data, $isCorrect, $confidence) {
+
+            if (! $isCorrect) {
+                $this->heartService->deduct($user, 1, 'failed_gesture_attempt', [
+                    'sign_id' => $data['sign_id'],
+                    'level_id' => $data['level_id'],
+                    'expected_sign' => $data['expected_sign'],
+                    'predicted_sign' => $data['predicted_sign'],
+                    'confidence' => $confidence,
+                ]);
+            }
 
             // 1. Store the gesture log
             $log = GestureLog::create([
-                'user_id'          => $userId,
-                'sign_id'          => $data['sign_id'],
-                'level_id'         => $data['level_id'],
-                'expected_sign'    => $data['expected_sign'],
-                'predicted_sign'   => $data['predicted_sign'],
-                'confidence'       => $confidence,
-                'is_correct'       => $isCorrect,
+                'user_id' => $userId,
+                'sign_id' => $data['sign_id'],
+                'level_id' => $data['level_id'],
+                'expected_sign' => $data['expected_sign'],
+                'predicted_sign' => $data['predicted_sign'],
+                'confidence' => $confidence,
+                'is_correct' => $isCorrect,
                 'attempt_duration' => $data['attempt_duration'] ?? null,
             ]);
 
-            // 2. Update progress (only if correct → otherwise just track attempts)
+            // 2. Update progress (only if correct -> otherwise just track attempts)
             $progress = $this->progressService->recordAttempt(
                 userId: $userId,
                 signId: $data['sign_id'],
@@ -57,7 +73,7 @@ class GestureService
             );
 
             return [
-                'log'      => $log,
+                'log' => $log,
                 'progress' => $progress,
             ];
         });
@@ -66,8 +82,8 @@ class GestureService
 
         return [
             'gesture_log' => $result['log'],
-            'progress'    => $result['progress'],
-            'is_correct'  => $isCorrect,
+            'progress' => $result['progress'],
+            'is_correct' => $isCorrect,
         ];
     }
 
@@ -94,15 +110,15 @@ class GestureService
      */
     public function getUserAccuracy(int $userId): array
     {
-        $total   = GestureLog::where('user_id', $userId)->count();
+        $total = GestureLog::where('user_id', $userId)->count();
         $correct = GestureLog::where('user_id', $userId)->where('is_correct', true)->count();
 
         $accuracy = $total > 0 ? round(($correct / $total) * 100, 2) : 0.0;
 
         return [
-            'total_attempts'   => $total,
+            'total_attempts' => $total,
             'correct_attempts' => $correct,
-            'accuracy'         => $accuracy,
+            'accuracy' => $accuracy,
         ];
     }
 }

@@ -17,6 +17,9 @@ class PlayerProfile extends Model
         'total_xp',
         'streak',
         'last_played_date',
+        'hearts',
+        'max_hearts',
+        'next_heart_at',
     ];
 
     protected function casts(): array
@@ -26,6 +29,9 @@ class PlayerProfile extends Model
             'total_xp'         => 'integer',
             'streak'           => 'integer',
             'last_played_date' => 'date',
+            'hearts' => 'integer',
+            'max_hearts' => 'integer',
+            'next_heart_at' => 'datetime',
         ];
     }
 

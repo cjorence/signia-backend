@@ -15,6 +15,9 @@ class PlayerProfileResource extends JsonResource
             'total_xp'         => $this->total_xp,
             'streak'           => $this->streak,
             'last_played_date' => $this->last_played_date?->toDateString(),
+            'hearts' => $this->hearts,
+            'max_hearts' => $this->max_hearts,
+            'next_heart_at' => $this->next_heart_at?->toISOString(),
         ];
     }
 }

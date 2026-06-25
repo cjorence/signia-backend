@@ -94,6 +94,16 @@ class User extends Authenticatable
             ->withPivot('unlocked_at')
             ->withTimestamps();
     }
+
+        public function purchases(): HasMany
+    {
+        return $this->hasMany(Purchase::class);
+    }
+
+    public function heartTransactions(): HasMany
+    {
+        return $this->hasMany(HeartTransaction::class);
+    }
     
     // ========================
     // HELPERS
