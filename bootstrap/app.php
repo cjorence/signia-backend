@@ -17,13 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // ✅ Keep this: It enables the cookie-based auth we just set up
-        $middleware->statefulApi();
-
-        // 🗑️ REMOVE the $middleware->validateCsrfTokens(except: [...]) block from here!
-        // Your BaseService is now handling the tokens correctly.
-
-        // ✅ Keep your other existing logic
+        // Bearer-token API auth only. Do not enable Sanctum stateful SPA cookies here,
+        // because that makes API login require CSRF.
         $middleware->prependToGroup('api', ForceJsonResponse::class);
 
         $middleware->alias([
@@ -31,7 +26,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // ✅ Keep your custom JSON exception handling
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthService
 {
@@ -40,18 +40,14 @@ class AuthService
      */
     public function login(array $credentials): array
     {
-        if (!Auth::attempt([
-            'email'    => $credentials['email'],
-            'password' => $credentials['password'],
-        ])) {
+        /** @var User|null $user */
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             return ['status' => 'invalid'];
         }
 
-        /** @var User $user */
-        $user = Auth::user();
-
         if (!$user->is_active) {
-            Auth::guard('web')->logout();
             return ['status' => 'inactive'];
         }
 
