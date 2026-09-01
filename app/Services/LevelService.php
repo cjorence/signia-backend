@@ -33,6 +33,15 @@ class LevelService
      */
     public function createLevel(array $data): Level
     {
+        if (!isset($data['order'])) {
+            $maxOrder = Level::max('order') ?? 0;
+            $data['order'] = $maxOrder + 1;
+        }
+
+        if (!isset($data['required_xp'])) {
+            $data['required_xp'] = 0;
+        }
+
         return Level::create($data);
     }
 

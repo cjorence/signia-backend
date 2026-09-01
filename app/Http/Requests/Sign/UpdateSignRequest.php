@@ -24,6 +24,7 @@ class UpdateSignRequest extends FormRequest
             'model_label' => ['sometimes', 'required', 'string', 'max:255'],
             'difficulty'  => ['sometimes', 'required', Rule::in(['easy', 'medium', 'hard'])],
             'xp_reward'   => ['sometimes', 'required', 'integer', 'min:0'],
+            'sort_order'  => ['sometimes', 'required', 'integer', 'min:0'],
         ];
     }
 }

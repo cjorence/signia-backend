@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Level;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLevelRequest extends FormRequest
 {
@@ -16,8 +17,9 @@ class StoreLevelRequest extends FormRequest
         return [
             'name'        => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'order'       => ['required', 'integer', 'min:0'],
-            'required_xp' => ['required', 'integer', 'min:0'],
+            'difficulty'  => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
+            'order'       => ['nullable', 'integer', 'min:0'],
+            'required_xp' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

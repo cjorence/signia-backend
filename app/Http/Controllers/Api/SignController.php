@@ -17,6 +17,17 @@ class SignController extends Controller
         protected SignService $signService
     ) {}
 
+    public function all(): JsonResponse
+    {
+        $levelId = request()->has('level_id') ? request()->integer('level_id') : null;
+        $signs = $this->signService->getAllSigns($levelId);
+
+        return response()->json([
+            'success' => true,
+            'data'    => SignResource::collection($signs),
+        ], 200);
+    }
+
     public function index(Level $level): JsonResponse
     {
         $signs = $this->signService->getSignsByLevel($level);

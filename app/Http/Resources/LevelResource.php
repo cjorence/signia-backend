@@ -13,6 +13,7 @@ class LevelResource extends JsonResource
             'id'          => $this->id,
             'name'        => $this->name,
             'description' => $this->description,
+            'difficulty'  => $this->difficulty ?? 'easy',
             'order'       => $this->order,
             'required_xp' => $this->required_xp,
             'signs_count' => $this->whenCounted('signs'),

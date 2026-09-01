@@ -31,6 +31,7 @@ Route::get('/levels/{level}', [LevelController::class, 'show']);
 Route::get('/levels/{level}/signs', [SignController::class, 'index']);
 Route::get('/levels/{level}/quests', [QuestController::class, 'index']);
 Route::get('/levels/{level}/quizzes', [QuizController::class, 'indexByLevel']);
+Route::get('/signs', [SignController::class, 'all']);
 Route::get('/signs/{sign}', [SignController::class, 'show']);
 Route::get('/quests/{quest}', [QuestController::class, 'show']);
 Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);

@@ -21,12 +21,14 @@ class Sign extends Model
         'model_label',
         'difficulty',
         'xp_reward',
+        'sort_order',
     ];
 
     protected function casts(): array
     {
         return [
             'xp_reward' => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 

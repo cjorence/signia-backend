@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Level;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLevelRequest extends FormRequest
 {
@@ -16,8 +17,9 @@ class UpdateLevelRequest extends FormRequest
         return [
             'name'        => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'order'       => ['sometimes', 'required', 'integer', 'min:0'],
-            'required_xp' => ['sometimes', 'required', 'integer', 'min:0'],
+            'difficulty'  => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
+            'order'       => ['nullable', 'integer', 'min:0'],
+            'required_xp' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

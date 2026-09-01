@@ -13,6 +13,7 @@ class Level extends Model
     protected $fillable = [
         'name',
         'description',
+        'difficulty',
         'order',
         'required_xp',
     ];
