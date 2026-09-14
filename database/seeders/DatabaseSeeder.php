@@ -18,18 +18,38 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::firstOrCreate(
-    ['email' => 'test@example.com'],
-    [
-        'name' => 'Test User',
-        'password' => 'password',
-        'role' => 'user',
-        'is_active' => true,
-        'email_verified_at' => now(),
-    ]
-    );
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@signia.app'],
+            [
+                'name' => 'Admin User',
+                'password' => 'password',
+                'role' => 'admin',
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
 
-     $this->call([
+        $player = User::updateOrCreate(
+            ['email' => 'player@signia.app'],
+            [
+                'name' => 'Player User',
+                'password' => 'password',
+                'role' => 'user',
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        $player->playerProfile()->firstOrCreate([], [
+            'current_level' => 1,
+            'total_xp'      => 0,
+            'streak'        => 0,
+            'hearts'        => 5,
+        ]);
+
+        $this->call([
+            LevelSeeder::class,
+            SignSeeder::class,
             AchievementSeeder::class,
         ]);
         
