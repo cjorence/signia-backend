@@ -19,6 +19,7 @@ class Progress extends Model
         'is_completed',
         'attempts',
         'best_confidence',
+        'xp_awarded_at',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class Progress extends Model
             'is_completed'    => 'boolean',
             'attempts'        => 'integer',
             'best_confidence' => 'decimal:2',
+            'xp_awarded_at'   => 'datetime',
         ];
     }
 

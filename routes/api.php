@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/user/quizzes/{quiz}/submit', [QuizController::class, 'submit']);
+    Route::post('/user/quizzes/{quiz}/questions/{question}/submit', [QuizController::class, 'submitQuestion']);
 
     Route::prefix('user/achievements')->group(function () {
         Route::get('/', [AchievementController::class, 'userAchievements']);

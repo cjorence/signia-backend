@@ -17,6 +17,7 @@ class ProgressResource extends JsonResource
             'is_completed'    => $this->is_completed,
             'attempts'        => $this->attempts,
             'best_confidence' => $this->best_confidence,
+            'xp_awarded_at'   => $this->xp_awarded_at?->toISOString(),
             'sign'            => new SignResource($this->whenLoaded('sign')),
             'level'           => new LevelResource($this->whenLoaded('level')),
             'created_at'      => $this->created_at?->toISOString(),

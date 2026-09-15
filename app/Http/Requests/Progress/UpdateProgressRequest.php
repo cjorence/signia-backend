@@ -16,8 +16,6 @@ class UpdateProgressRequest extends FormRequest
         return [
             'sign_id'         => ['required', 'integer', 'exists:signs,id'],
             'level_id'        => ['required', 'integer', 'exists:levels,id'],
-            'is_completed'    => ['sometimes', 'boolean'],
-            'best_confidence' => ['sometimes', 'numeric', 'between:0,100'],
         ];
     }
 
@@ -29,5 +27,23 @@ class UpdateProgressRequest extends FormRequest
             'level_id.required' => 'Level ID is required.',
             'level_id.exists'   => 'The selected level does not exist.',
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $signId = $this->input('sign_id');
+            $levelId = $this->input('level_id');
+
+            if ($signId && $levelId) {
+                $belongs = \App\Models\Sign::where('id', $signId)
+                    ->where('level_id', $levelId)
+                    ->exists();
+
+                if (! $belongs) {
+                    $validator->errors()->add('sign_id', 'The selected sign does not belong to the specified level.');
+                }
+            }
+        });
     }
 }

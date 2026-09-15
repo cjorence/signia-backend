@@ -2,8 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\GestureLog;
+use App\Models\Level;
+use App\Models\PlayerProfile;
 use App\Models\Progress;
+use App\Models\Question;
+use App\Models\QuizAttempt;
+use App\Models\Sign;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProgressService
 {
@@ -46,82 +54,190 @@ class ProgressService
     }
 
     /**
+     * Check if user has recorded valid practice/gesture evidence for the given sign.
+     */
+    public function hasValidPracticeEvidence(int $userId, Sign $sign): bool
+    {
+        return GestureLog::where('user_id', $userId)
+            ->where('sign_id', $sign->id)
+            ->where('is_correct', true)
+            ->where('confidence', '>=', self::COMPLETION_THRESHOLD)
+            ->exists();
+    }
+
+    /**
+     * Check if user has passed the required quiz for the given sign.
+     */
+    public function hasValidQuizEvidence(int $userId, Sign $sign): bool
+    {
+        $questionIds = Question::where('sign_id', $sign->id)->pluck('id');
+
+        // A sign needs its own mapped question. A correct answer for another
+        // question in the same quiz must never unlock this sign.
+        if ($questionIds->isEmpty()) {
+            return false;
+        }
+
+        return QuizAttempt::where('user_id', $userId)
+            ->whereIn('question_id', $questionIds)
+            ->where('score', '>', 0)
+            ->exists();
+    }
+
+    /**
+     * Determine if a sign satisfies both practice and quiz criteria for completion.
+     */
+    public function canCompleteSign(int $userId, Sign $sign): bool
+    {
+        return $this->hasValidPracticeEvidence($userId, $sign)
+            && $this->hasValidQuizEvidence($userId, $sign);
+    }
+
+    /**
      * Increment attempts and update best confidence based on a new gesture attempt.
-     * Auto-marks sign as completed when threshold is reached.
+     * Completion is evaluated separately after the corresponding evidence is stored.
      */
     public function recordAttempt(int $userId, int $signId, int $levelId, float $confidence): Progress
     {
-        $progress = Progress::firstOrNew([
-            'user_id' => $userId,
-            'sign_id' => $signId,
-        ]);
+        return DB::transaction(function () use ($userId, $signId, $levelId, $confidence) {
+            $sign = Sign::findOrFail($signId);
+            if ((int) $sign->level_id !== (int) $levelId) {
+                throw ValidationException::withMessages([
+                    'sign_id' => 'The selected sign does not belong to the specified level.',
+                ]);
+            }
 
-        // Ensure level_id is set (preserves existing or assigns new)
-        $progress->level_id = $levelId;
+            $progress = Progress::where('user_id', $userId)
+                ->where('sign_id', $signId)
+                ->lockForUpdate()
+                ->first();
 
-        // Increment attempts
-        $progress->attempts = ($progress->attempts ?? 0) + 1;
+            if (! $progress) {
+                $progress = new Progress([
+                    'user_id' => $userId,
+                    'sign_id' => $signId,
+                ]);
+            }
 
-        // Update best confidence only if the new one is higher
-        if ($confidence > (float) ($progress->best_confidence ?? 0)) {
-            $progress->best_confidence = $confidence;
-        }
+            $progress->level_id = $levelId;
+            $progress->attempts = ($progress->attempts ?? 0) + 1;
 
-        // Auto-complete if threshold reached
-        if ((float) $progress->best_confidence >= self::COMPLETION_THRESHOLD) {
-            $progress->is_completed = true;
-        }
+            if ($confidence > (float) ($progress->best_confidence ?? 0)) {
+                $progress->best_confidence = $confidence;
+            }
 
-        $progress->save();
+            $progress->save();
 
-        return $progress->load(['sign', 'level']);
+            return $progress->load(['sign', 'level']);
+        });
     }
 
     /**
-     * Manually update progress (used by user-facing endpoint).
+     * Create or retrieve progress metadata. Player input cannot complete a sign
+     * or award XP; evidence routes evaluate completion themselves.
      */
     public function updateProgress(int $userId, array $data): Progress
     {
-        $progress = Progress::firstOrNew([
-            'user_id' => $userId,
-            'sign_id' => $data['sign_id'],
-        ]);
+        return DB::transaction(function () use ($userId, $data) {
+            $sign = Sign::findOrFail($data['sign_id']);
 
-        $progress->level_id = $data['level_id'];
-
-        if (isset($data['is_completed'])) {
-            $progress->is_completed = $data['is_completed'];
-        }
-
-        if (isset($data['best_confidence'])) {
-            // Keep the higher value
-            if ((float) $data['best_confidence'] > (float) ($progress->best_confidence ?? 0)) {
-                $progress->best_confidence = $data['best_confidence'];
+            // Validate that sign_id belongs to level_id server-side
+            if ((int) $sign->level_id !== (int) $data['level_id']) {
+                throw ValidationException::withMessages([
+                    'sign_id' => 'The selected sign does not belong to the specified level.',
+                ]);
             }
-        }
 
-        $progress->save();
+            $progress = Progress::where('user_id', $userId)
+                ->where('sign_id', $data['sign_id'])
+                ->lockForUpdate()
+                ->first();
 
-        return $progress->load(['sign', 'level']);
+            if (! $progress) {
+                $progress = new Progress([
+                    'user_id' => $userId,
+                    'sign_id' => $data['sign_id'],
+                ]);
+            }
+
+            $progress->level_id = $data['level_id'];
+
+            $progress->save();
+
+            return $progress->load(['sign', 'level']);
+        });
     }
 
     /**
-     * Mark a sign as completed manually.
+     * Evaluate completion only after a gesture or quiz attempt has been stored.
      */
-    public function markCompleted(int $userId, int $signId): ?Progress
+    public function evaluateCompletion(int $userId, int $signId): ?Progress
     {
-        $progress = Progress::where('user_id', $userId)
-                            ->where('sign_id', $signId)
-                            ->first();
+        return DB::transaction(function () use ($userId, $signId) {
+            $sign = Sign::findOrFail($signId);
+            $progress = Progress::where('user_id', $userId)
+                ->where('sign_id', $signId)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$progress) {
-            return null;
+            if (! $progress || $progress->is_completed || ! $this->canCompleteSign($userId, $sign)) {
+                return $progress?->load(['sign', 'level']);
+            }
+
+            $progress->is_completed = true;
+            $this->awardXpAndAdvanceLevel($userId, $progress, $sign);
+            $progress->save();
+
+            return $progress->load(['sign', 'level']);
+        });
+    }
+
+    /**
+     * Award XP once for a sign and recalculate player level.
+     */
+    protected function awardXpAndAdvanceLevel(int $userId, Progress $progress, Sign $sign): void
+    {
+        // Server-side duplicate protection: only award XP if not already awarded
+        if (! is_null($progress->xp_awarded_at)) {
+            return;
         }
 
-        $progress->is_completed = true;
-        $progress->save();
+        $xpReward = (int) ($sign->xp_reward ?? 0);
 
-        return $progress->load(['sign', 'level']);
+        $profile = PlayerProfile::where('user_id', $userId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $profile) {
+            $profile = PlayerProfile::create([
+                'user_id'       => $userId,
+                'current_level' => 1,
+                'total_xp'      => 0,
+                'streak'        => 0,
+                'hearts'        => 5,
+            ]);
+        }
+
+        $profile->total_xp = ($profile->total_xp ?? 0) + $xpReward;
+
+        // Level thresholds are admin-managed data and are never changed during play.
+        $highestLevel = Level::where('required_xp', '<=', $profile->total_xp)
+            ->where(function ($query) {
+                $query->where('order', 1)
+                    ->orWhere('required_xp', '>', 0);
+            })
+            ->orderBy('required_xp', 'desc')
+            ->orderBy('order', 'desc')
+            ->first();
+
+        if ($highestLevel) {
+            $newLevel = $highestLevel->order ?: $highestLevel->id;
+            $profile->current_level = max($profile->current_level ?? 1, $newLevel);
+        }
+
+        $profile->save();
+
+        $progress->xp_awarded_at = now();
     }
 
     /**

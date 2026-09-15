@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Progress\UpdateProgressRequest;
+use App\Http\Resources\PlayerProfileResource;
 use App\Http\Resources\ProgressResource;
+use App\Models\User;
 use App\Services\ProgressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -67,19 +69,23 @@ class ProgressController extends Controller
 
     /**
      * POST /api/user/progress
-     * Manually update progress.
+     * Manually update progress and return updated profile summary data.
      */
     public function update(UpdateProgressRequest $request): JsonResponse
     {
+        $userId = (int) Auth::id();
         $progress = $this->progressService->updateProgress(
-            Auth::id(),
+            $userId,
             $request->validated()
         );
+
+        $user = User::with('playerProfile')->find($userId);
 
         return response()->json([
             'success' => true,
             'message' => 'Progress updated successfully.',
             'data'    => new ProgressResource($progress),
+            'profile' => $user?->playerProfile ? new PlayerProfileResource($user->playerProfile) : null,
         ], 200);
     }
 }

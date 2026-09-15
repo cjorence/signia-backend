@@ -33,4 +33,9 @@ class Question extends Model
     {
         return $this->hasMany(Choice::class);
     }
+
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class);
+    }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Choice\StoreChoiceRequest;
 use App\Http\Requests\Question\StoreQuestionRequest;
 use App\Http\Requests\Quiz\StoreQuizRequest;
+use App\Http\Requests\Quiz\SubmitQuestionRequest;
 use App\Http\Requests\Quiz\SubmitQuizRequest;
 use App\Http\Resources\ChoiceResource;
 use App\Http\Resources\QuestionResource;
@@ -158,5 +159,27 @@ class QuizController extends Controller
                 'total_questions' => $result['total_questions'],
             ],
         ], 201);
+    }
+
+    public function submitQuestion(SubmitQuestionRequest $request, Quiz $quiz, Question $question): JsonResponse
+    {
+        $result = $this->quizService->submitQuestionAttempt(
+            Auth::id(),
+            $quiz,
+            $question,
+            $request->validated('answer')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['is_correct'] ? 'Correct answer!' : 'Incorrect answer.',
+            'data' => [
+                'attempt' => new QuizAttemptResource($result['attempt']),
+                'is_correct' => $result['is_correct'],
+                'score' => $result['score'],
+                'total_questions' => 1,
+                'wrong_answers' => $result['wrong_answers'],
+            ],
+        ], 200);
     }
 }

@@ -18,6 +18,7 @@ class QuizService
     {
         return $level->quizzes()
             ->where('is_active', true)
+            ->with(['questions.choices', 'questions.sign'])
             ->withCount('questions')
             ->orderBy('id')
             ->get();
@@ -125,7 +126,7 @@ class QuizService
     $score = $answers->reduce(function (int $score, array $answer) use ($questions): int {
         $question = $questions->get((int) $answer['question_id']);
 
-        return $this->isCorrectAnswer($question, $answer['answer'])
+        return $this->isCorrectAnswer($question, $answer['answer'], 'answers')
             ? $score + 1
             : $score;
     }, 0);
@@ -157,14 +158,68 @@ class QuizService
     ];
 }
 
-    protected function isCorrectAnswer(Question $question, mixed $answer): bool
+    public function submitQuestionAttempt(int $userId, Quiz $quiz, Question $question, mixed $answer): array
+    {
+        if (! $quiz->is_active) {
+            throw ValidationException::withMessages([
+                'quiz' => 'Inactive quizzes cannot be submitted.',
+            ]);
+        }
+
+        if ($question->quiz_id !== $quiz->id) {
+            throw ValidationException::withMessages([
+                'question' => 'The selected question does not belong to this quiz.',
+            ]);
+        }
+
+        $user = User::findOrFail($userId);
+        $this->heartService->ensureCanAttempt($user);
+
+        $question->loadMissing('choices');
+        $isCorrect = $this->isCorrectAnswer($question, $answer);
+        $score = $isCorrect ? 1 : 0;
+        $wrongAnswers = $isCorrect ? 0 : 1;
+
+        $attempt = DB::transaction(function () use ($user, $quiz, $question, $score, $wrongAnswers) {
+            if ($wrongAnswers > 0) {
+                $this->heartService->deduct($user, 1, 'wrong_quiz_answer', [
+                    'quiz_id' => $quiz->id,
+                    'question_id' => $question->id,
+                    'score' => $score,
+                    'total_questions' => 1,
+                ]);
+            }
+
+            return QuizAttempt::create([
+                'user_id' => $user->id,
+                'quiz_id' => $quiz->id,
+                'question_id' => $question->id,
+                'score' => $score,
+                'completed_at' => now(),
+            ]);
+        });
+
+        if ($question->sign_id) {
+            $this->progressService->evaluateCompletion($userId, $question->sign_id);
+        }
+
+        return [
+            'attempt' => $attempt->load(['quiz', 'question']),
+            'is_correct' => $isCorrect,
+            'score' => $score,
+            'total_questions' => 1,
+            'wrong_answers' => $wrongAnswers,
+        ];
+    }
+
+    protected function isCorrectAnswer(Question $question, mixed $answer, string $errorKey = 'answer'): bool
     {
         if ($question->question_type === 'mcq') {
             $choice = $question->choices->firstWhere('id', (int) $answer);
 
             if (! $choice) {
                 throw ValidationException::withMessages([
-                    'answers' => 'One or more selected choices do not belong to the submitted question.',
+                    $errorKey => 'The selected choice is invalid or does not belong to the submitted question.',
                 ]);
             }
 
@@ -175,6 +230,7 @@ class QuizService
     }
 
     public function __construct(
-        protected HeartService $heartService
+        protected HeartService $heartService,
+        protected ProgressService $progressService
     ) {}
 }
