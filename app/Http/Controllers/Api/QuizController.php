@@ -167,7 +167,8 @@ class QuizController extends Controller
             Auth::id(),
             $quiz,
             $question,
-            $request->validated('answer')
+            $request->validated('answer'),
+            $request->validated('answer_sign_id')
         );
 
         return response()->json([

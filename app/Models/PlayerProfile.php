@@ -19,6 +19,7 @@ class PlayerProfile extends Model
         'last_played_date',
         'hearts',
         'max_hearts',
+        'heart_inventory',
         'next_heart_at',
     ];
 
@@ -31,6 +32,7 @@ class PlayerProfile extends Model
             'last_played_date' => 'date',
             'hearts' => 'integer',
             'max_hearts' => 'integer',
+            'heart_inventory' => 'integer',
             'next_heart_at' => 'datetime',
         ];
     }

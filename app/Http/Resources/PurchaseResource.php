@@ -20,6 +20,7 @@ class PurchaseResource extends JsonResource
             'status' => $this->status,
             'provider' => $this->provider,
             'provider_reference' => $this->provider_reference,
+            'checkout_session_id' => $this->checkout_session_id,
             'paid_at' => $this->paid_at?->toISOString(),
             'payment_transactions' => PaymentTransactionResource::collection($this->whenLoaded('paymentTransactions')),
             'created_at' => $this->created_at?->toISOString(),

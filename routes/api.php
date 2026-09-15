@@ -82,7 +82,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('user')->group(function () {
         Route::get('/hearts', [HeartController::class, 'status']);
         Route::get('/hearts/transactions', [HeartController::class, 'transactions']);
+        Route::post('/hearts/refill', [HeartController::class, 'refill']);
 
+        Route::post('/purchases/checkout', [PurchaseController::class, 'checkout']);
         Route::post('/purchases', [PurchaseController::class, 'store']);
         Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);

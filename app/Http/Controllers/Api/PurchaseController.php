@@ -7,6 +7,7 @@ use App\Http\Requests\Purchase\StorePurchaseRequest;
 use App\Http\Resources\PurchaseResource;
 use App\Models\Purchase;
 use App\Services\HeartService;
+use App\Services\PaymentService;
 use App\Services\PurchaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,8 @@ class PurchaseController extends Controller
 {
     public function __construct(
         protected PurchaseService $purchaseService,
-        protected HeartService $heartService
+        protected HeartService $heartService,
+        protected PaymentService $paymentService
     ) {}
 
     public function store(StorePurchaseRequest $request): JsonResponse
@@ -30,6 +32,24 @@ class PurchaseController extends Controller
             'success' => true,
             'message' => 'Purchase created successfully. Complete payment to receive hearts.',
             'data' => new PurchaseResource($purchase),
+        ], 201);
+    }
+
+    public function checkout(StorePurchaseRequest $request): JsonResponse
+    {
+        $purchase = $this->purchaseService->createHeartPurchase(
+            Auth::user(),
+            $request->validated('package_key')
+        );
+
+        $checkout = $this->paymentService->createCheckoutSession($purchase);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'purchase' => new PurchaseResource($checkout['purchase']),
+                'checkout_url' => $checkout['checkout_url'],
+            ],
         ], 201);
     }
 

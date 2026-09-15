@@ -7,6 +7,7 @@ use App\Models\Level;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Models\Sign;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,12 +17,14 @@ class QuizService
 {
     public function getActiveQuizzesByLevel(Level $level): Collection
     {
-        return $level->quizzes()
+        $quizzes = $level->quizzes()
             ->where('is_active', true)
             ->with(['questions.choices', 'questions.sign'])
             ->withCount('questions')
             ->orderBy('id')
             ->get();
+
+        return $this->attachLessonOptions($quizzes, $level);
     }
 
     public function getQuizForPlayer(Quiz $quiz): Quiz
@@ -32,7 +35,9 @@ class QuizService
             ]);
         }
 
-        return $quiz->load(['level', 'questions.choices', 'questions.sign']);
+        $quiz->load(['level', 'questions.choices', 'questions.sign']);
+
+        return $this->attachLessonOptions(collect([$quiz]), $quiz->level)->first();
     }
 
     public function getQuizForAdmin(Quiz $quiz): Quiz
@@ -59,6 +64,8 @@ class QuizService
 
     public function addQuestion(Quiz $quiz, array $data): Question
     {
+        $this->ensureQuestionSignMatchesLevel($quiz, $data['sign_id'] ?? null);
+
         $question = $quiz->questions()->create($data);
 
         return $question->load(['choices', 'sign']);
@@ -66,6 +73,11 @@ class QuizService
 
     public function updateQuestion(Question $question, array $data): Question
     {
+        $this->ensureQuestionSignMatchesLevel(
+            $question->quiz,
+            $data['sign_id'] ?? $question->sign_id
+        );
+
         $question->update($data);
 
         return $question->fresh()->load(['choices', 'sign']);
@@ -158,7 +170,13 @@ class QuizService
     ];
 }
 
-    public function submitQuestionAttempt(int $userId, Quiz $quiz, Question $question, mixed $answer): array
+    public function submitQuestionAttempt(
+        int $userId,
+        Quiz $quiz,
+        Question $question,
+        mixed $answer = null,
+        ?int $answerSignId = null
+    ): array
     {
         if (! $quiz->is_active) {
             throw ValidationException::withMessages([
@@ -172,15 +190,38 @@ class QuizService
             ]);
         }
 
+        $question->loadMissing('sign');
+
+        if ($question->sign_id && $question->sign?->level_id !== $quiz->level_id) {
+            throw ValidationException::withMessages([
+                'question' => 'The selected question is not configured for this quiz level.',
+            ]);
+        }
+
+        $quiz->loadMissing('level');
         $user = User::findOrFail($userId);
         $this->heartService->ensureCanAttempt($user);
 
-        $question->loadMissing('choices');
-        $isCorrect = $this->isCorrectAnswer($question, $answer);
+        if ($question->sign_id) {
+            $lessonOptions = $this->lessonOptionsForQuestion($question, $quiz->level);
+            $isEligibleOption = collect($lessonOptions)
+                ->contains(fn (array $option) => $option['sign_id'] === $answerSignId);
+
+            if (! $isEligibleOption) {
+                throw ValidationException::withMessages([
+                    'answer_sign_id' => 'The selected sign is not an available answer for this lesson.',
+                ]);
+            }
+
+            $isCorrect = $answerSignId === $question->sign_id;
+        } else {
+            $question->loadMissing('choices');
+            $isCorrect = $this->isCorrectAnswer($question, $answer);
+        }
         $score = $isCorrect ? 1 : 0;
         $wrongAnswers = $isCorrect ? 0 : 1;
 
-        $attempt = DB::transaction(function () use ($user, $quiz, $question, $score, $wrongAnswers) {
+        $attempt = DB::transaction(function () use ($user, $quiz, $question, $score, $wrongAnswers, $answerSignId) {
             if ($wrongAnswers > 0) {
                 $this->heartService->deduct($user, 1, 'wrong_quiz_answer', [
                     'quiz_id' => $quiz->id,
@@ -194,6 +235,7 @@ class QuizService
                 'user_id' => $user->id,
                 'quiz_id' => $quiz->id,
                 'question_id' => $question->id,
+                'answer_sign_id' => $answerSignId,
                 'score' => $score,
                 'completed_at' => now(),
             ]);
@@ -227,6 +269,76 @@ class QuizService
         }
 
         return strtolower(trim((string) $answer)) === strtolower(trim($question->correct_answer));
+    }
+
+    private function ensureQuestionSignMatchesLevel(Quiz $quiz, ?int $signId): void
+    {
+        if ($signId === null) {
+            return;
+        }
+
+        $sign = Sign::findOrFail($signId);
+
+        if ($sign->level_id !== $quiz->level_id) {
+            throw ValidationException::withMessages([
+                'sign_id' => 'The selected sign must belong to the quiz level.',
+            ]);
+        }
+    }
+
+    private function attachLessonOptions(Collection $quizzes, Level $level): Collection
+    {
+        foreach ($quizzes as $quiz) {
+            foreach ($quiz->questions as $question) {
+                $question->setAttribute('lesson_options', $this->lessonOptionsForQuestion($question, $level));
+            }
+        }
+
+        return $quizzes;
+    }
+
+    /**
+     * Player lesson options come from the ordered signs in the same category.
+     * The first four signs share the category's first four answers. Later
+     * signs use themselves plus three deterministic pseudo-random earlier signs.
+     * This keeps a displayed option valid when the player submits it; the
+     * frontend is responsible for shuffling the visual order per attempt.
+     */
+    private function lessonOptionsForQuestion(Question $question, Level $level): array
+    {
+        if (! $question->sign_id) {
+            return [];
+        }
+
+        $orderedSigns = $level->signs()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name', 'fsl_name', 'model_label']);
+        $currentIndex = $orderedSigns->search(
+            fn (Sign $sign) => $sign->id === $question->sign_id
+        );
+
+        if ($currentIndex === false) {
+            return [];
+        }
+
+        $currentSign = $orderedSigns->get($currentIndex);
+        $options = $currentIndex < 4
+            ? $orderedSigns->take(4)
+            : collect([$currentSign])->merge(
+                $orderedSigns
+                    ->take($currentIndex)
+                    ->sortBy(fn (Sign $sign) => crc32("{$question->id}:{$sign->id}"))
+                    ->take(3)
+            );
+
+        return $options
+            ->map(fn (Sign $sign) => [
+                'sign_id' => $sign->id,
+                'label' => $sign->fsl_name ?: $sign->name,
+            ])
+            ->values()
+            ->all();
     }
 
     public function __construct(

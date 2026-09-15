@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Heart\AdminGrantHeartsRequest;
+use App\Http\Requests\Heart\RefillHeartInventoryRequest;
 use App\Http\Resources\HeartTransactionResource;
 use App\Http\Resources\PlayerProfileResource;
 use App\Models\User;
@@ -34,6 +35,20 @@ class HeartController extends Controller
         return response()->json([
             'success' => true,
             'data' => HeartTransactionResource::collection($transactions),
+        ], 200);
+    }
+
+    public function refill(RefillHeartInventoryRequest $request): JsonResponse
+    {
+        $profile = $this->heartService->refillFromInventory(
+            Auth::user(),
+            $request->validated('amount')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Usable hearts refilled from inventory.',
+            'data' => new PlayerProfileResource($profile),
         ], 200);
     }
 

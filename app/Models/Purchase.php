@@ -21,6 +21,7 @@ class Purchase extends Model
         'status',
         'provider',
         'provider_reference',
+        'checkout_session_id',
         'paid_at',
     ];
 
