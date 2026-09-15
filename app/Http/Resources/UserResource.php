@@ -17,6 +17,10 @@ class UserResource extends JsonResource
             'is_active'       => $this->is_active,
             'last_active_at'  => $this->last_active_at?->toISOString(),
             'player_profile'  => new PlayerProfileResource($this->whenLoaded('playerProfile')),
+            'signs_learned_count' => $this->when(
+                isset($this->signs_learned_count),
+                (int) $this->signs_learned_count
+            ),
             'created_at'      => $this->created_at?->toISOString(),
         ];
     }
