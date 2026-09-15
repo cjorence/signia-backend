@@ -207,6 +207,7 @@ class HeartService
         return HeartTransaction::where('user_id', $user->id)
             ->with('purchase')
             ->orderByDesc('created_at')
+            ->limit(100)
             ->get();
     }
 

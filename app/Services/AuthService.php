@@ -77,6 +77,10 @@ class AuthService
      */
     public function me(User $user): User
     {
-        return $user->load('playerProfile');
+        return $user
+            ->load('playerProfile')
+            ->loadCount([
+                'progress as signs_learned_count' => fn ($query) => $query->where('is_completed', true),
+            ]);
     }
 }
