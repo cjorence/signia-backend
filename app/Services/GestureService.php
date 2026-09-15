@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\GestureLog;
+use App\Models\Sign;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class GestureService
 {
@@ -29,8 +31,16 @@ class GestureService
 
         $this->heartService->ensureCanAttempt($user);
 
-        // Compare expected vs predicted (case-insensitive)
-        $expected = strtolower(trim($data['expected_sign']));
+        $sign = Sign::findOrFail($data['sign_id']);
+        if ((int) $sign->level_id !== (int) $data['level_id']) {
+            throw ValidationException::withMessages([
+                'sign_id' => 'The selected sign does not belong to the specified level.',
+            ]);
+        }
+
+        // Expected labels are derived from the database. Prediction telemetry is
+        // supplied by the browser until the AI service is moved server-side.
+        $expected = strtolower(trim((string) ($sign->model_label ?: $sign->name)));
         $predicted = strtolower(trim($data['predicted_sign']));
         $confidence = (float) $data['confidence'];
 
@@ -40,13 +50,13 @@ class GestureService
         $isCorrect = ($expected === $predicted) && ($confidence >= self::CORRECTNESS_THRESHOLD);
 
         // Persist log + heart deduction + progress update atomically
-        $result = DB::transaction(function () use ($user, $userId, $data, $isCorrect, $confidence) {
+        $result = DB::transaction(function () use ($user, $userId, $data, $sign, $expected, $isCorrect, $confidence) {
 
             if (! $isCorrect) {
                 $this->heartService->deduct($user, 1, 'failed_gesture_attempt', [
                     'sign_id' => $data['sign_id'],
                     'level_id' => $data['level_id'],
-                    'expected_sign' => $data['expected_sign'],
+                    'expected_sign' => $expected,
                     'predicted_sign' => $data['predicted_sign'],
                     'confidence' => $confidence,
                 ]);
@@ -57,7 +67,7 @@ class GestureService
                 'user_id' => $userId,
                 'sign_id' => $data['sign_id'],
                 'level_id' => $data['level_id'],
-                'expected_sign' => $data['expected_sign'],
+                'expected_sign' => $expected,
                 'predicted_sign' => $data['predicted_sign'],
                 'confidence' => $confidence,
                 'is_correct' => $isCorrect,
@@ -65,12 +75,14 @@ class GestureService
             ]);
 
             // 2. Update progress (only if correct -> otherwise just track attempts)
-            $progress = $this->progressService->recordAttempt(
+            $this->progressService->recordAttempt(
                 userId: $userId,
                 signId: $data['sign_id'],
                 levelId: $data['level_id'],
                 confidence: $isCorrect ? $confidence : 0.0
             );
+
+            $progress = $this->progressService->evaluateCompletion($userId, $sign->id);
 
             return [
                 'log' => $log,

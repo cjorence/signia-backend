@@ -13,9 +13,11 @@ class QuizAttemptResource extends JsonResource
             'id' => $this->id,
             'user_id' => $this->user_id,
             'quiz_id' => $this->quiz_id,
+            'question_id' => $this->question_id,
             'score' => $this->score,
             'completed_at' => $this->completed_at?->toISOString(),
             'quiz' => new QuizResource($this->whenLoaded('quiz')),
+            'question' => new QuestionResource($this->whenLoaded('question')),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }
