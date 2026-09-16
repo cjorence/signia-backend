@@ -185,4 +185,67 @@ class AdminLessonSystemTest extends TestCase
         \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($sign->image_url);
         \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($sign->video_url);
     }
+
+    public function test_admin_can_reorder_signs(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $level = Level::create([
+            'name' => 'Alphabet',
+            'order' => 1,
+            'required_xp' => 0,
+        ]);
+
+        $sign1 = Sign::create([
+            'level_id' => $level->id,
+            'name' => 'Sign 1',
+            'model_label' => 's1',
+            'difficulty' => 'easy',
+            'xp_reward' => 10,
+            'sort_order' => 1,
+        ]);
+
+        $sign2 = Sign::create([
+            'level_id' => $level->id,
+            'name' => 'Sign 2',
+            'model_label' => 's2',
+            'difficulty' => 'easy',
+            'xp_reward' => 10,
+            'sort_order' => 2,
+        ]);
+
+        $res = $this->postJson('/api/admin/signs/reorder', [
+            'items' => [
+                ['id' => $sign1->id, 'sort_order' => 2],
+                ['id' => $sign2->id, 'sort_order' => 1],
+            ]
+        ]);
+
+        $res->assertOk()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('signs', ['id' => $sign1->id, 'sort_order' => 2]);
+        $this->assertDatabaseHas('signs', ['id' => $sign2->id, 'sort_order' => 1]);
+    }
+
+    public function test_admin_can_reorder_levels(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $level1 = Level::create(['name' => 'L1', 'order' => 1, 'required_xp' => 0]);
+        $level2 = Level::create(['name' => 'L2', 'order' => 2, 'required_xp' => 0]);
+
+        $res = $this->postJson('/api/admin/levels/reorder', [
+            'items' => [
+                ['id' => $level1->id, 'order' => 2],
+                ['id' => $level2->id, 'order' => 1],
+            ]
+        ]);
+
+        $res->assertOk()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('levels', ['id' => $level1->id, 'order' => 2]);
+        $this->assertDatabaseHas('levels', ['id' => $level2->id, 'order' => 1]);
+    }
 }

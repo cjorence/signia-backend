@@ -9,6 +9,7 @@ use App\Http\Resources\LevelResource;
 use App\Models\Level;
 use App\Services\LevelService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class LevelController extends Controller
 {
@@ -65,6 +66,22 @@ class LevelController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Level deleted successfully.',
+        ], 200);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer', 'exists:levels,id'],
+            'items.*.order' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $this->levelService->reorderLevels($validated['items']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Levels reordered successfully.',
         ], 200);
     }
 }

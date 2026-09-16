@@ -15,8 +15,59 @@ use Illuminate\Validation\ValidationException;
 
 class QuizService
 {
+    public function ensureQuestionsForLevelSigns(Level $level): void
+    {
+        $quiz = $level->quizzes()->where('is_active', true)->first()
+            ?? $level->quizzes()->first();
+
+        if (! $quiz) {
+            $quiz = Quiz::create([
+                'level_id' => $level->id,
+                'title' => "{$level->name} Quiz",
+                'description' => "Practice quiz for {$level->name}",
+                'is_active' => true,
+            ]);
+        }
+
+        $signs = $level->signs()->get();
+        if ($signs->isEmpty()) {
+            return;
+        }
+
+        $existingSignIds = Question::where('quiz_id', $quiz->id)
+            ->whereNotNull('sign_id')
+            ->pluck('sign_id')
+            ->all();
+
+        $isAlphabet = str_contains(strtolower($quiz->title), 'alphabet')
+            || str_contains(strtolower($level->name), 'alphabet');
+        $questionText = $isAlphabet ? 'What alphabet letter is shown?' : 'What sign is shown?';
+
+        foreach ($signs as $sign) {
+            if (! in_array($sign->id, $existingSignIds)) {
+                $letter = $sign->fsl_name ?: $sign->name;
+
+                $question = Question::create([
+                    'quiz_id' => $quiz->id,
+                    'sign_id' => $sign->id,
+                    'question_text' => $questionText,
+                    'question_type' => 'mcq',
+                    'correct_answer' => $letter,
+                ]);
+
+                Choice::create([
+                    'question_id' => $question->id,
+                    'choice_text' => $letter,
+                    'is_correct' => true,
+                ]);
+            }
+        }
+    }
+
     public function getActiveQuizzesByLevel(Level $level): Collection
     {
+        $this->ensureQuestionsForLevelSigns($level);
+
         $quizzes = $level->quizzes()
             ->where('is_active', true)
             ->with(['questions.choices', 'questions.sign'])
@@ -286,7 +337,7 @@ class QuizService
         }
     }
 
-    private function attachLessonOptions(Collection $quizzes, Level $level): Collection
+    private function attachLessonOptions(\Illuminate\Support\Collection|Collection $quizzes, Level $level): \Illuminate\Support\Collection|Collection
     {
         foreach ($quizzes as $quiz) {
             foreach ($quiz->questions as $question) {
