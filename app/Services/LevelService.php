@@ -62,4 +62,16 @@ class LevelService
     {
         return (bool) $level->delete();
     }
+
+    /**
+     * Batch update level orders atomically.
+     */
+    public function reorderLevels(array $items): void
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($items) {
+            foreach ($items as $item) {
+                Level::where('id', $item['id'])->update(['order' => $item['order']]);
+            }
+        });
+    }
 }

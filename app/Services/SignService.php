@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Choice;
 use App\Models\Level;
+use App\Models\Question;
 use App\Models\Sign;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -45,7 +47,7 @@ class SignService
     }
 
     /**
-     * Create a new sign.
+     * Create a new sign and ensure a quiz question is available for it.
      */
     public function createSign(array $data): Sign
     {
@@ -55,6 +57,11 @@ class SignService
         }
 
         $sign = Sign::create($data);
+
+        $level = Level::find($sign->level_id);
+        if ($level) {
+            app(QuizService::class)->ensureQuestionsForLevelSigns($level);
+        }
 
         return $sign->load('level');
     }
@@ -66,6 +73,11 @@ class SignService
     {
         $sign->update($data);
 
+        $letter = $sign->fsl_name ?: $sign->name;
+        Question::where('sign_id', $sign->id)->update(['correct_answer' => $letter]);
+        $questionIds = Question::where('sign_id', $sign->id)->pluck('id');
+        Choice::whereIn('question_id', $questionIds)->where('is_correct', true)->update(['choice_text' => $letter]);
+
         return $sign->fresh()->load('level');
     }
 
@@ -75,5 +87,17 @@ class SignService
     public function deleteSign(Sign $sign): bool
     {
         return (bool) $sign->delete();
+    }
+
+    /**
+     * Batch update sign sort orders atomically.
+     */
+    public function reorderSigns(array $items): void
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($items) {
+            foreach ($items as $item) {
+                Sign::where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
+            }
+        });
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Level;
 use App\Models\Sign;
 use App\Services\SignService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class SignController extends Controller
 {
@@ -77,6 +78,22 @@ class SignController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Sign deleted successfully.',
+        ], 200);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer', 'exists:signs,id'],
+            'items.*.sort_order' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $this->signService->reorderSigns($validated['items']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signs reordered successfully.',
         ], 200);
     }
 }

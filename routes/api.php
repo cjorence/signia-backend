@@ -98,11 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('admin')->prefix('admin')->group(function () {
 
         // Levels
+        Route::post('/levels/reorder', [LevelController::class, 'reorder']);
         Route::post('/levels', [LevelController::class, 'store']);
         Route::put('/levels/{level}', [LevelController::class, 'update']);
         Route::delete('/levels/{level}', [LevelController::class, 'destroy']);
 
         // Signs
+        Route::post('/signs/reorder', [SignController::class, 'reorder']);
         Route::post('/signs', [SignController::class, 'store']);
         Route::put('/signs/{sign}', [SignController::class, 'update']);
         Route::delete('/signs/{sign}', [SignController::class, 'destroy']);
