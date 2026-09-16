@@ -14,6 +14,7 @@ class Purchase extends Model
     protected $fillable = [
         'user_id',
         'product_type',
+        'story_id',
         'package_key',
         'quantity',
         'amount',
@@ -37,6 +38,11 @@ class Purchase extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function story(): BelongsTo
+    {
+        return $this->belongsTo(Story::class);
     }
 
     public function paymentTransactions(): HasMany

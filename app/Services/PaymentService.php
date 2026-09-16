@@ -34,6 +34,19 @@ class PaymentService
         $referenceNumber = 'purchase:'.$purchase->id;
         $amountInCentavos = (int) round(((float) $purchase->amount) * 100);
 
+        if ($purchase->product_type === 'story') {
+            $purchase->loadMissing('story');
+            $chapterNum = $purchase->story?->chapter_number ?? 1;
+            $chapterTitle = $purchase->story?->title ?? 'Story Chapter';
+            $lineItemName = 'Signia Quest: Chapter '.$chapterNum.' - '.$chapterTitle;
+            $successUrl = $frontendUrl.'/player/story?payment=success&purchase_id='.$purchase->id.'&story_id='.($purchase->story_id ?? '');
+            $cancelUrl = $frontendUrl.'/player/story?payment=cancelled&story_id='.($purchase->story_id ?? '');
+        } else {
+            $lineItemName = $purchase->quantity.' Signia Heart Credits';
+            $successUrl = $frontendUrl.'/player/store?payment=success&purchase_id='.$purchase->id;
+            $cancelUrl = $frontendUrl.'/player/store?payment=cancelled&purchase_id='.$purchase->id;
+        }
+
         try {
             $response = Http::acceptJson()
                 ->asJson()
@@ -42,18 +55,20 @@ class PaymentService
                     'data' => [
                         'attributes' => [
                             'line_items' => [[
-                                'name' => $purchase->quantity.' Signia Heart Credits',
+                                'name' => $lineItemName,
                                 'amount' => $amountInCentavos,
                                 'currency' => $purchase->currency,
                                 'quantity' => 1,
                             ]],
                             'payment_method_types' => ['card'],
-                            'success_url' => $frontendUrl.'/player/store?payment=success&purchase_id='.$purchase->id,
-                            'cancel_url' => $frontendUrl.'/player/store?payment=cancelled&purchase_id='.$purchase->id,
+                            'success_url' => $successUrl,
+                            'cancel_url' => $cancelUrl,
                             'reference_number' => $referenceNumber,
                             'metadata' => [
                                 'purchase_id' => (string) $purchase->id,
                                 'user_id' => (string) $purchase->user_id,
+                                'product_type' => (string) $purchase->product_type,
+                                'story_id' => (string) ($purchase->story_id ?? ''),
                             ],
                         ],
                     ],
@@ -220,16 +235,85 @@ class PaymentService
                 'paid_at' => now(),
             ]);
 
-            app(HeartService::class)->creditInventory(
-                $purchase->user,
-                $purchase->quantity,
-                'paymongo_checkout_paid',
-                $purchase,
-                ['checkout_session_id' => $checkoutSessionId]
-            );
+            if ($purchase->product_type === 'story') {
+                $purchase->loadMissing('story');
+                if ($purchase->story) {
+                    app(StoryService::class)->unlockForUser(
+                        $purchase->user,
+                        $purchase->story,
+                        $purchase
+                    );
+                }
+            } else {
+                app(HeartService::class)->creditInventory(
+                    $purchase->user,
+                    $purchase->quantity,
+                    'paymongo_checkout_paid',
+                    $purchase,
+                    ['checkout_session_id' => $checkoutSessionId]
+                );
+            }
 
-            return $purchase->fresh()->load(['user', 'paymentTransactions']);
+            return $purchase->fresh()->load(['user', 'paymentTransactions', 'story']);
         });
+    }
+
+    public function verifyCheckoutSession(Purchase $purchase): Purchase
+    {
+        if ($purchase->status === 'paid') {
+            return $purchase->load(['user', 'paymentTransactions', 'story']);
+        }
+
+        if ($purchase->status !== 'pending' || ! $purchase->checkout_session_id) {
+            return $purchase;
+        }
+
+        $secretKey = (string) config('services.paymongo.secret_key');
+        if ($secretKey === '') {
+            return $purchase;
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->withBasicAuth($secretKey, '')
+                ->get(rtrim((string) config('services.paymongo.api_url'), '/').'/v2/checkout_sessions/'.$purchase->checkout_session_id);
+
+            if ($response->successful()) {
+                $sessionData = $response->json('data.attributes');
+                $payments = $sessionData['payments'] ?? [];
+                $isPaid = false;
+
+                foreach ($payments as $payment) {
+                    if (data_get($payment, 'attributes.status') === 'paid') {
+                        $isPaid = true;
+                        break;
+                    }
+                }
+
+                if ($isPaid) {
+                    $fakeEvent = [
+                        'data' => [
+                            'attributes' => [
+                                'type' => 'checkout_session.payment.paid',
+                                'livemode' => config('services.paymongo.mode') === 'live',
+                                'data' => [
+                                    'id' => $purchase->checkout_session_id,
+                                    'attributes' => [
+                                        'reference_number' => 'purchase:'.$purchase->id,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ];
+
+                    return $this->fulfillCheckoutPayment($fakeEvent) ?? $purchase->fresh();
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $purchase->fresh()->load(['user', 'paymentTransactions', 'story']);
     }
 
     public function ensureProviderReferenceIsUnused(string $providerReference): void

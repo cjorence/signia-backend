@@ -51,6 +51,7 @@ class DatabaseSeeder extends Seeder
             LevelSeeder::class,
             SignSeeder::class,
             AchievementSeeder::class,
+            StorySeeder::class,
         ]);
         
     }

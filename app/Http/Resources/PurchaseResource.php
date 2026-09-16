@@ -13,6 +13,7 @@ class PurchaseResource extends JsonResource
             'id' => $this->id,
             'user_id' => $this->user_id,
             'product_type' => $this->product_type,
+            'story_id' => $this->story_id,
             'package_key' => $this->package_key,
             'quantity' => $this->quantity,
             'amount' => $this->amount,

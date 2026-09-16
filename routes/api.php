@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\AchievementController;
 use App\Http\Controllers\Api\HeartController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\StoryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,6 +37,8 @@ Route::get('/signs/{sign}', [SignController::class, 'show']);
 Route::get('/quests/{quest}', [QuestController::class, 'show']);
 Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);
 Route::get('/achievements', [AchievementController::class, 'index']);
+Route::get('/stories', [StoryController::class, 'index']);
+Route::get('/stories/{story}', [StoryController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -88,6 +91,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/purchases', [PurchaseController::class, 'store']);
         Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+        Route::post('/purchases/{purchase}/verify', [PurchaseController::class, 'verify']);
+
+        Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
+        Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
     });
 
     /*
