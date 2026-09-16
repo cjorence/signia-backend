@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class SignResource extends JsonResource
 {
@@ -15,8 +16,8 @@ class SignResource extends JsonResource
             'name'        => $this->name,
             'fsl_name'    => $this->fsl_name,
             'description' => $this->description,
-            'image_url'   => $this->image_url,
-            'video_url'   => $this->video_url,
+            'image_url'   => $this->formatMediaUrl($this->image_url),
+            'video_url'   => $this->formatMediaUrl($this->video_url),
             'model_label' => $this->model_label,
             'difficulty'  => $this->difficulty,
             'xp_reward'   => $this->xp_reward,
@@ -24,5 +25,23 @@ class SignResource extends JsonResource
             'level'       => new LevelResource($this->whenLoaded('level')),
             'created_at'  => $this->created_at?->toISOString(),
         ];
+    }
+
+    protected function formatMediaUrl(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        $cleanPath = ltrim($url, '/');
+        if (!str_starts_with($cleanPath, 'storage/')) {
+            $cleanPath = 'storage/' . $cleanPath;
+        }
+
+        return asset($cleanPath);
     }
 }

@@ -19,6 +19,8 @@ class StoreSignRequest extends FormRequest
             'name'        => ['required', 'string', 'max:255'],
             'fsl_name'    => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'image'       => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
+            'video'       => ['nullable', 'file', 'mimes:mp4,mov,avi,webm,mkv', 'max:51200'],
             'image_url'   => ['nullable', 'string', 'max:2048'],
             'video_url'   => ['nullable', 'string', 'max:2048'],
             'model_label' => ['required', 'string', 'max:255'],

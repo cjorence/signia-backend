@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Level;
 use App\Models\Sign;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class SignService
 {
@@ -54,6 +56,8 @@ class SignService
             $data['sort_order'] = $maxOrder + 1;
         }
 
+        $data = $this->handleFileUploads($data);
+
         $sign = Sign::create($data);
 
         return $sign->load('level');
@@ -64,6 +68,8 @@ class SignService
      */
     public function updateSign(Sign $sign, array $data): Sign
     {
+        $data = $this->handleFileUploads($data, $sign);
+
         $sign->update($data);
 
         return $sign->fresh()->load('level');
@@ -74,6 +80,38 @@ class SignService
      */
     public function deleteSign(Sign $sign): bool
     {
+        if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
+            Storage::disk('public')->delete($sign->image_url);
+        }
+
+        if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
+            Storage::disk('public')->delete($sign->video_url);
+        }
+
         return (bool) $sign->delete();
+    }
+
+    /**
+     * Process image and video uploads if provided, returning processed data array.
+     */
+    protected function handleFileUploads(array $data, ?Sign $existingSign = null): array
+    {
+        if (isset($data['image']) && $data['image'] instanceof UploadedFile) {
+            if ($existingSign?->image_url && Storage::disk('public')->exists($existingSign->image_url)) {
+                Storage::disk('public')->delete($existingSign->image_url);
+            }
+            $data['image_url'] = $data['image']->store('signs/images', 'public');
+        }
+        unset($data['image']);
+
+        if (isset($data['video']) && $data['video'] instanceof UploadedFile) {
+            if ($existingSign?->video_url && Storage::disk('public')->exists($existingSign->video_url)) {
+                Storage::disk('public')->delete($existingSign->video_url);
+            }
+            $data['video_url'] = $data['video']->store('signs/videos', 'public');
+        }
+        unset($data['video']);
+
+        return $data;
     }
 }
