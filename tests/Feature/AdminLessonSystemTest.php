@@ -140,6 +140,52 @@ class AdminLessonSystemTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_admin_can_upload_and_delete_sign_media_files(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $level = Level::create([
+            'name' => 'FSL Greetings',
+            'order' => 1,
+            'required_xp' => 0,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $image = \Illuminate\Http\UploadedFile::fake()->create('hello.jpg', 100, 'image/jpeg');
+        $video = \Illuminate\Http\UploadedFile::fake()->create('hello.mp4', 500, 'video/mp4');
+
+        $createRes = $this->postJson('/api/admin/signs', [
+            'level_id' => $level->id,
+            'name' => 'Hello',
+            'model_label' => 'hello',
+            'difficulty' => 'easy',
+            'xp_reward' => 15,
+            'image' => $image,
+            'video' => $video,
+        ]);
+
+        $createRes->assertCreated()
+            ->assertJsonPath('success', true);
+
+        $sign = Sign::first();
+        $this->assertNotNull($sign->image_url);
+        $this->assertNotNull($sign->video_url);
+
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($sign->image_url);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($sign->video_url);
+
+        $createRes->assertJsonPath('data.image_url', asset('storage/' . $sign->image_url));
+        $createRes->assertJsonPath('data.video_url', asset('storage/' . $sign->video_url));
+
+        // Delete sign
+        $this->deleteJson("/api/admin/signs/{$sign->id}")->assertOk();
+
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($sign->image_url);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertMissing($sign->video_url);
+    }
+
     public function test_admin_can_reorder_signs(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('image_url')->nullable();
             $table->string('video_url')->nullable();
-            $table->string('model_label');
+            $table->string('model_label')->nullable();
             $table->enum('difficulty', ['easy', 'medium', 'hard'])->default('easy');
             $table->unsignedInteger('xp_reward')->default(10);
             $table->timestamps();

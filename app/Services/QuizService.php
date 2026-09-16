@@ -337,7 +337,7 @@ class QuizService
         }
     }
 
-    private function attachLessonOptions(Collection $quizzes, Level $level): Collection
+    private function attachLessonOptions(\Illuminate\Support\Collection|Collection $quizzes, Level $level): \Illuminate\Support\Collection|Collection
     {
         foreach ($quizzes as $quiz) {
             foreach ($quiz->questions as $question) {
