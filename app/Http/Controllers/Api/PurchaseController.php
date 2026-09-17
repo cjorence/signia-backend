@@ -73,6 +73,18 @@ class PurchaseController extends Controller
         ], 200);
     }
 
+    public function verify(Purchase $purchase): JsonResponse
+    {
+        abort_if($purchase->user_id !== Auth::id() && Auth::user()->role !== 'admin', 403);
+
+        $verifiedPurchase = $this->paymentService->verifyCheckoutSession($purchase);
+
+        return response()->json([
+            'success' => true,
+            'data' => new PurchaseResource($verifiedPurchase),
+        ], 200);
+    }
+
     public function adminPurchases(): JsonResponse
     {
         $purchases = $this->purchaseService->getAllPurchases();

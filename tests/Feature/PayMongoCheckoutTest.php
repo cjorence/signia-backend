@@ -118,4 +118,103 @@ class PayMongoCheckoutTest extends TestCase
 
         $this->assertSame(0, $player->playerProfile->fresh()->heart_inventory);
     }
+
+    public function test_player_can_create_checkout_session_for_locked_story_chapter(): void
+    {
+        $this->configurePayMongo();
+        $player = User::factory()->create(['role' => 'user']);
+        $story = \App\Models\Story::create([
+            'slug' => 'plaza',
+            'title' => 'Unang Gabi sa Plaza',
+            'chapter_number' => 2,
+            'order' => 2,
+            'is_free' => false,
+            'price' => 49.00,
+            'currency' => 'PHP',
+        ]);
+
+        Http::fake([
+            'https://api.paymongo.test/v2/checkout_sessions' => Http::response([
+                'data' => [
+                    'id' => 'cs_test_story_chap2',
+                    'attributes' => ['checkout_url' => 'https://checkout.paymongo.test/story/chap2'],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($player);
+
+        $this->postJson("/api/user/stories/{$story->id}/checkout")
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.checkout_url', 'https://checkout.paymongo.test/story/chap2')
+            ->assertJsonPath('data.purchase.story_id', $story->id);
+
+        $this->assertDatabaseHas('purchases', [
+            'user_id' => $player->id,
+            'product_type' => 'story',
+            'story_id' => $story->id,
+            'checkout_session_id' => 'cs_test_story_chap2',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_paid_story_webhook_unlocks_chapter_for_player(): void
+    {
+        $this->configurePayMongo();
+        $player = User::factory()->create(['role' => 'user']);
+        $story = \App\Models\Story::create([
+            'slug' => 'plaza',
+            'title' => 'Unang Gabi sa Plaza',
+            'chapter_number' => 2,
+            'order' => 2,
+            'is_free' => false,
+            'price' => 49.00,
+            'currency' => 'PHP',
+        ]);
+
+        $purchase = Purchase::create([
+            'user_id' => $player->id,
+            'product_type' => 'story',
+            'story_id' => $story->id,
+            'package_key' => 'story_chapter_2',
+            'quantity' => 1,
+            'amount' => 49,
+            'currency' => 'PHP',
+            'status' => 'pending',
+            'provider' => 'paymongo',
+            'checkout_session_id' => 'cs_test_story_paid',
+        ]);
+
+        $payload = json_encode([
+            'data' => [
+                'attributes' => [
+                    'type' => 'checkout_session.payment.paid',
+                    'livemode' => false,
+                    'data' => [
+                        'id' => 'cs_test_story_paid',
+                        'attributes' => ['reference_number' => 'purchase:'.$purchase->id],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+        $timestamp = now()->timestamp;
+        $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_example');
+        $headers = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_PAYMONGO_SIGNATURE' => 't='.$timestamp.',te='.$signature.',li=',
+        ];
+
+        $this->call('POST', '/api/payments/webhook', [], [], [], $headers, $payload)
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('purchases', ['id' => $purchase->id, 'status' => 'paid']);
+        $this->assertDatabaseHas('user_story_unlocks', [
+            'user_id' => $player->id,
+            'story_id' => $story->id,
+            'purchase_id' => $purchase->id,
+        ]);
+        $this->assertTrue($story->isUnlockedFor($player));
+    }
 }

@@ -1,4 +1,6 @@
 *
 !private/
 !public/
+!stories/
+!stories/**
 !.gitignore

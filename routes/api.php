@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\AchievementController;
 use App\Http\Controllers\Api\HeartController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\StoryController;
+use App\Http\Controllers\Api\AdminStoryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,6 +38,10 @@ Route::get('/signs/{sign}', [SignController::class, 'show']);
 Route::get('/quests/{quest}', [QuestController::class, 'show']);
 Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);
 Route::get('/achievements', [AchievementController::class, 'index']);
+Route::get('/stories', [StoryController::class, 'index']);
+Route::get('/stories/package', [StoryController::class, 'package']);
+Route::get('/stories/{story}', [StoryController::class, 'show']);
+Route::post('/stories/verify-ticket', [StoryController::class, 'verifyTicket']);
 
 /*
 |--------------------------------------------------------------------------
@@ -88,6 +94,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/purchases', [PurchaseController::class, 'store']);
         Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+        Route::post('/purchases/{purchase}/verify', [PurchaseController::class, 'verify']);
+
+        Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
+        Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
+        Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
     });
 
     /*
@@ -145,5 +156,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/heart-transactions', [HeartController::class, 'adminTransactions']);
         Route::post('/users/{user}/hearts/grant', [HeartController::class, 'grant']);
+
+        // Story Chapters (Admin Dynamic Story Management)
+        Route::get('/stories', [AdminStoryController::class, 'index']);
+        Route::post('/stories', [AdminStoryController::class, 'store']);
+        Route::get('/stories/{story}', [AdminStoryController::class, 'show']);
+        Route::post('/stories/{story}', [AdminStoryController::class, 'update']);
+        Route::put('/stories/{story}', [AdminStoryController::class, 'update']);
+        Route::delete('/stories/{story}', [AdminStoryController::class, 'destroy']);
     });
 });
