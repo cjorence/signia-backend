@@ -39,6 +39,7 @@ Route::get('/quizzes/{quiz}', [QuizController::class, 'show']);
 Route::get('/achievements', [AchievementController::class, 'index']);
 Route::get('/stories', [StoryController::class, 'index']);
 Route::get('/stories/{story}', [StoryController::class, 'show']);
+Route::post('/stories/verify-ticket', [StoryController::class, 'verifyTicket']);
 
 /*
 |--------------------------------------------------------------------------
@@ -95,6 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
         Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
+        Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
     });
 
     /*

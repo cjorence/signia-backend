@@ -87,4 +87,35 @@ class StoryController extends Controller
             'data' => $result,
         ], 200);
     }
+
+    public function launchTicket(Request $request, Story $story): JsonResponse
+    {
+        $user = Auth::user();
+        $ticketData = $this->storyService->createLaunchTicket($user, $story);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Launch ticket generated successfully.',
+            'data' => $ticketData,
+        ], 200);
+    }
+
+    public function verifyTicket(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ticket' => ['required', 'string'],
+            'chapter' => ['required'],
+        ]);
+
+        $verification = $this->storyService->verifyLaunchTicket(
+            $validated['ticket'],
+            $validated['chapter']
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Launch ticket verified.',
+            'data' => $verification,
+        ], 200);
+    }
 }

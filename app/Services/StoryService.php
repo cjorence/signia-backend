@@ -142,4 +142,89 @@ class StoryService
             ];
         });
     }
+
+    public function createLaunchTicket(User $user, Story $story): array
+    {
+        if (! $story->isUnlockedFor($user)) {
+            throw ValidationException::withMessages([
+                'story' => 'You must unlock Chapter '.$story->chapter_number.' to play.',
+            ]);
+        }
+
+        $appKey = (string) config('app.key');
+        if (str_starts_with($appKey, 'base64:')) {
+            $appKey = base64_decode(substr($appKey, 7));
+        }
+
+        $payload = [
+            'user_id' => $user->id,
+            'story_id' => $story->id,
+            'chapter_number' => (int) $story->chapter_number,
+            'expires_at' => now()->addMinutes(5)->timestamp,
+            'nonce' => \Illuminate\Support\Str::random(16),
+        ];
+
+        $encodedPayload = rtrim(strtr(base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        $signature = hash_hmac('sha256', $encodedPayload, $appKey);
+        $ticket = $encodedPayload.'.'.$signature;
+
+        return [
+            'ticket' => $ticket,
+            'chapter_number' => (int) $story->chapter_number,
+            'story_id' => $story->id,
+            'expires_at' => $payload['expires_at'],
+        ];
+    }
+
+    public function verifyLaunchTicket(string $ticket, int|string $chapterNumber): array
+    {
+        $parts = explode('.', $ticket, 2);
+        if (count($parts) !== 2) {
+            throw ValidationException::withMessages([
+                'ticket' => 'Invalid ticket format.',
+            ]);
+        }
+
+        [$encodedPayload, $signature] = $parts;
+
+        $appKey = (string) config('app.key');
+        if (str_starts_with($appKey, 'base64:')) {
+            $appKey = base64_decode(substr($appKey, 7));
+        }
+
+        $expectedSignature = hash_hmac('sha256', $encodedPayload, $appKey);
+        if (! hash_equals($expectedSignature, $signature)) {
+            throw ValidationException::withMessages([
+                'ticket' => 'Invalid ticket signature.',
+            ]);
+        }
+
+        $json = base64_decode(strtr($encodedPayload, '-_', '+/'));
+        $payload = json_decode($json, true);
+
+        if (! is_array($payload) || ! isset($payload['expires_at'], $payload['chapter_number'])) {
+            throw ValidationException::withMessages([
+                'ticket' => 'Malformed ticket payload.',
+            ]);
+        }
+
+        if (now()->timestamp > (int) $payload['expires_at']) {
+            throw ValidationException::withMessages([
+                'ticket' => 'Launch ticket has expired. Please launch from Signia.',
+            ]);
+        }
+
+        if ((int) $payload['chapter_number'] !== (int) $chapterNumber) {
+            throw ValidationException::withMessages([
+                'ticket' => 'Ticket chapter does not match requested chapter.',
+            ]);
+        }
+
+        return [
+            'valid' => true,
+            'user_id' => $payload['user_id'] ?? null,
+            'story_id' => $payload['story_id'] ?? null,
+            'chapter_number' => (int) $payload['chapter_number'],
+        ];
+    }
 }
