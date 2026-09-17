@@ -118,4 +118,36 @@ class StoryController extends Controller
             'data' => $verification,
         ], 200);
     }
+
+    public function package(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'ticket' => ['required', 'string'],
+            'chapter' => ['required'],
+        ]);
+
+        try {
+            $packageInfo = $this->storyService->resolveAuthorizedPackage(
+                $validated['ticket'],
+                $validated['chapter']
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 403);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to serve package: ' . $e->getMessage(),
+            ], 403);
+        }
+
+        return response()->file($packageInfo['file_path'], [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . $packageInfo['file_name'] . '"',
+            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+        ]);
+    }
 }

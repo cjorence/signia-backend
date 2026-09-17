@@ -227,4 +227,51 @@ class StoryService
             'chapter_number' => (int) $payload['chapter_number'],
         ];
     }
+
+    public function getPackageFilePath(?Story $story = null): string
+    {
+        if ($story && ! empty($story->file_name)) {
+            $customPath = storage_path('app/stories/'.$story->file_name);
+            if (file_exists($customPath)) {
+                return $customPath;
+            }
+        }
+
+        $basePath = storage_path('app/stories/base.pck');
+        if (! file_exists($basePath)) {
+            $altPath = storage_path('app/stories/index.pck');
+            if (file_exists($altPath)) {
+                return $altPath;
+            }
+        }
+
+        return $basePath;
+    }
+
+    public function resolveAuthorizedPackage(string $ticket, int|string $chapterNumber): array
+    {
+        $verification = $this->verifyLaunchTicket($ticket, $chapterNumber);
+
+        $story = Story::where('id', $verification['story_id'])
+            ->orWhere('chapter_number', (int) $chapterNumber)
+            ->first();
+
+        if (! $story) {
+            throw ValidationException::withMessages([
+                'chapter' => 'Story chapter not found.',
+            ]);
+        }
+
+        $filePath = $this->getPackageFilePath($story);
+        if (! file_exists($filePath)) {
+            throw new \RuntimeException('Game chapter package file not found on server.');
+        }
+
+        return [
+            'file_path' => $filePath,
+            'file_name' => $story->file_name ?: 'chapter_'.$story->chapter_number.'.pck',
+            'size' => filesize($filePath),
+            'story' => $story,
+        ];
+    }
 }
