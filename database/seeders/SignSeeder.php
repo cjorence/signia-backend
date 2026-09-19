@@ -23,12 +23,14 @@ class SignSeeder extends Seeder
                 'order' => 3,
                 'difficulty' => 'easy',
                 'xp_reward' => 10,
-            ],
+                'model_name'=> 'number'
+            ],  
             'GREETING' => [
                 'level' => 'FSL Greetings',
                 'order' => 4,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
+                'model_name'=>'greeting'
             ],
 
             'SURVIVAL' => [
@@ -36,6 +38,7 @@ class SignSeeder extends Seeder
                 'order' => 5,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
+                'model_name'=>'survival'
             ],
 
             'CALENDAR' => [
@@ -43,6 +46,7 @@ class SignSeeder extends Seeder
                 'order' => 6,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'calendar'
             ],
 
             'DAYS' => [
@@ -50,6 +54,7 @@ class SignSeeder extends Seeder
                 'order' => 7,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'days'
             ],
 
             'FAMILY' => [
@@ -57,6 +62,7 @@ class SignSeeder extends Seeder
                 'order' => 8,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
+                'model_name'=>'family'
             ],
 
             'RELATIONSHIPS' => [
@@ -64,6 +70,7 @@ class SignSeeder extends Seeder
                 'order' => 9,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
+                'model_name'=>'relationships'
             ],
 
             'COLOR' => [
@@ -71,6 +78,7 @@ class SignSeeder extends Seeder
                 'order' => 10,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'color'
             ],
 
             'FOOD' => [
@@ -78,6 +86,7 @@ class SignSeeder extends Seeder
                 'order' => 11,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'food'
             ],
 
             'DRINK' => [
@@ -85,6 +94,7 @@ class SignSeeder extends Seeder
                 'order' => 12,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'drink'
             ],
 
             'PRONOUN' => [
@@ -92,6 +102,7 @@ class SignSeeder extends Seeder
                 'order' => 13,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
+                'model_name'=>'pronoun'
             ],
 
             'COMMUNICATION' => [
@@ -99,6 +110,7 @@ class SignSeeder extends Seeder
                 'order' => 14,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
+                'model_name'=>'communication'
             ],
 
             'CONVERSATIONAL' => [
@@ -106,6 +118,7 @@ class SignSeeder extends Seeder
                 'order' => 15,
                 'difficulty' => 'hard',
                 'xp_reward' => 20,
+                'model_name'=>'conversational'
             ],
         ];
 
@@ -123,7 +136,8 @@ class SignSeeder extends Seeder
                     'name' => $config['level'],
                 ],
                 [
-                    'order' => $config['order'],
+                    'order'      => $config['order'],
+                    'mode_level' => $config['model_name'] ?? null,
                 ]
             );
         }
@@ -144,36 +158,62 @@ class SignSeeder extends Seeder
             ],
             [
                 'order' => 1,
+                'mode_level' => 'alphabet',
             ]
         );
 
         $alphabetDescriptions = [
-            'A' => 'FSL sign for the letter A.',
-            'B' => 'FSL sign for the letter B.',
-            'C' => 'FSL sign for the letter C.',
-            'D' => 'FSL sign for the letter D.',
-            'E' => 'FSL sign for the letter E.',
-            'F' => 'FSL sign for the letter F.',
-            'G' => 'FSL sign for the letter G.',
-            'H' => 'FSL sign for the letter H.',
-            'I' => 'FSL sign for the letter I.',
-            'J' => 'FSL sign for the letter J.',
-            'K' => 'FSL sign for the letter K.',
-            'L' => 'FSL sign for the letter L.',
-            'M' => 'FSL sign for the letter M.',
-            'N' => 'FSL sign for the letter N.',
-            'O' => 'FSL sign for the letter O.',
-            'P' => 'FSL sign for the letter P.',
-            'Q' => 'FSL sign for the letter Q.',
-            'R' => 'FSL sign for the letter R.',
-            'S' => 'FSL sign for the letter S.',
-            'T' => 'FSL sign for the letter T.',
-            'U' => 'FSL sign for the letter U.',
-            'V' => 'FSL sign for the letter V.',
-            'W' => 'FSL sign for the letter W.',
-            'X' => 'FSL sign for the letter X.',
-            'Y' => 'FSL sign for the letter Y.',
-            'Z' => 'FSL sign for the letter Z.',
+            'A' => 'Make a fist with your thumb resting against the side of your index finger. Keep your fingers together and point your thumb upward.',
+
+            'B' => 'Hold your hand upright with all four fingers extended and held together. Fold your thumb across your palm.',
+
+            'C' => 'Curve your fingers and thumb to form a C shape, as if holding a small object. Keep your palm facing sideways.',
+
+            'D' => 'Extend your index finger upward. Touch the tips of your thumb, middle, ring, and little fingers together to form a rounded shape.',
+
+            'E' => 'Curl your four fingers down toward your palm and place your thumb across the front of your fingers.',
+
+            'F' => 'Touch the tips of your thumb and index finger together to form a circle. Keep your other three fingers extended upward.',
+
+            'G' => 'Extend your index finger and thumb horizontally, with the two fingers pointing in the same direction. Keep your other fingers curled into your palm.',
+
+            'H' => 'Extend your index and middle fingers together horizontally. Keep your other fingers and thumb curled into your palm.',
+
+            'I' => 'Make a fist while keeping your little finger extended upward.',
+
+            'J' => 'Make the handshape for I with your little finger extended. Move your little finger downward and curve it to trace the shape of a J.',
+
+            'K' => 'Extend your index and middle fingers upward in a V shape. Place your thumb between them while keeping your ring and little fingers folded.',
+
+            'L' => 'Extend your thumb and index finger to form an L shape. Keep your other three fingers curled into your palm.',
+
+            'M' => 'Fold your thumb across your palm and place your index, middle, and ring fingers over it. Keep your little finger curled beside them.',
+
+            'N' => 'Fold your thumb across your palm and place your index and middle fingers over it. Keep your ring and little fingers curled.',
+
+            'O' => 'Curve all your fingers and thumb together to form a round O shape. Keep your fingertips touching or close together.',
+
+            'P' => 'Form the K handshape, then angle your hand downward so your extended fingers point toward the ground.',
+
+            'Q' => 'Extend your index finger and thumb downward, with both pointing in the same direction. Keep your other fingers curled into your palm.',
+
+            'R' => 'Extend your index and middle fingers upward and cross them. Keep your thumb, ring, and little fingers folded into your palm.',
+
+            'S' => 'Make a fist with all four fingers curled tightly into your palm. Place your thumb across the front of your fingers.',
+
+            'T' => 'Make a fist and place your thumb between your index and middle fingers.',
+
+            'U' => 'Extend your index and middle fingers upward and hold them together. Keep your other fingers and thumb curled into your palm.',
+
+            'V' => 'Extend your index and middle fingers upward and separate them to form a V shape. Keep your other fingers and thumb folded.',
+
+            'W' => 'Extend your index, middle, and ring fingers upward and spread them apart. Keep your thumb and little finger folded.',
+
+            'X' => 'Make a fist while extending your index finger. Bend the index finger at the middle joint to form a hook shape.',
+
+            'Y' => 'Extend your thumb and little finger outward while keeping your index, middle, and ring fingers curled into your palm.',
+
+            'Z' => 'Extend your index finger and use it to trace the shape of the letter Z in the air.',
         ];
 
         $alphabetOrder = 1;
@@ -187,13 +227,12 @@ class SignSeeder extends Seeder
                 [
                     'fsl_name' => $letter,
                     'description' => $description,
-
-                    // User requested model_label to be null
-                    'model_label' => null,
-
                     'difficulty' => 'easy',
                     'xp_reward' => 10,
                     'sort_order' => $alphabetOrder,
+                    'video_type' => 'local',
+                    'video_start' => null,
+                    'video_end' => null,
 
                     // Alphabet uses image instead of video
                     'video_url' => null,
@@ -390,22 +429,20 @@ class SignSeeder extends Seeder
                     'name' => $displayName,
                 ],
                 [
-                    'fsl_name' => $label,
-
+                    'fsl_name'    => $label,
                     'description' => "FSL sign for {$displayName}.",
+                    'difficulty'  => $config['difficulty'],
+                    'xp_reward'   => $config['xp_reward'],
+                    'sort_order'  => $sortOrders[$category],
 
-                    // Intentionally NULL
-                    'model_label' => null,
-
-                    'difficulty' => $config['difficulty'],
-                    'xp_reward' => $config['xp_reward'],
-                    'sort_order' => $sortOrders[$category],
-
-                    // Non-alphabet signs use videos
-                    'video_url' => $videoUrl,
+                    // Non-alphabet signs use local videos by default
+                    'video_url'   => $videoUrl,
+                    'video_type'  => 'local',
+                    'video_start' => null,
+                    'video_end'   => null,
 
                     // No image URL for normal signs
-                    'image_url' => null,
+                    'image_url'   => null,
                 ]
             );
 
