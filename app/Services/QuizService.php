@@ -213,6 +213,8 @@ class QuizService
         ]);
     });
 
+    $this->progressService->recordDailyStreak($user->id);
+
     return [
         'attempt' => $attempt->load('quiz'),
         'score' => $score,
@@ -295,6 +297,8 @@ class QuizService
         if ($question->sign_id) {
             $this->progressService->evaluateCompletion($userId, $question->sign_id);
         }
+
+        $this->progressService->recordDailyStreak($userId);
 
         return [
             'attempt' => $attempt->load(['quiz', 'question']),

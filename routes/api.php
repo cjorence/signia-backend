@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\StoryController;
 use App\Http\Controllers\Api\AdminStoryController;
+use App\Http\Controllers\Api\FinisherController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -42,6 +43,7 @@ Route::get('/stories', [StoryController::class, 'index']);
 Route::get('/stories/package', [StoryController::class, 'package']);
 Route::get('/stories/{story}', [StoryController::class, 'show']);
 Route::post('/stories/verify-ticket', [StoryController::class, 'verifyTicket']);
+Route::get('/finishers', [FinisherController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------

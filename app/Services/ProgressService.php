@@ -128,6 +128,8 @@ class ProgressService
 
             $progress->save();
 
+            $this->recordDailyStreak($userId);
+
             return $progress->load(['sign', 'level']);
         });
     }
@@ -163,6 +165,8 @@ class ProgressService
             $progress->level_id = $data['level_id'];
 
             $progress->save();
+
+            $this->recordDailyStreak($userId);
 
             return $progress->load(['sign', 'level']);
         });
@@ -237,7 +241,62 @@ class ProgressService
 
         $profile->save();
 
+        $this->recordDailyStreak($userId, $profile);
+
         $progress->xp_awarded_at = now();
+    }
+
+    /**
+     * Record daily practice activity and advance streak.
+     */
+    public function recordDailyStreak(int $userId, ?PlayerProfile $profile = null): int
+    {
+        $today = now()->startOfDay();
+
+        if (! $profile) {
+            $profile = PlayerProfile::where('user_id', $userId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $profile) {
+                $profile = PlayerProfile::create([
+                    'user_id'          => $userId,
+                    'current_level'    => 1,
+                    'total_xp'         => 0,
+                    'streak'           => 1,
+                    'hearts'           => 5,
+                    'last_played_date' => $today,
+                ]);
+                return 1;
+            }
+        }
+
+        if (! $profile->last_played_date) {
+            $profile->streak = 1;
+            $profile->last_played_date = $today;
+            $profile->save();
+            return 1;
+        }
+
+        $lastPlayed = $profile->last_played_date->copy()->startOfDay();
+
+        if ($lastPlayed->isToday()) {
+            // Already practiced today; maintain streak
+            return (int) $profile->streak;
+        }
+
+        if ($lastPlayed->isYesterday()) {
+            // Consecutive day practice (+1)
+            $profile->streak = (int) ($profile->streak ?? 0) + 1;
+        } else {
+            // Missed a day or more, restart streak at 1
+            $profile->streak = 1;
+        }
+
+        $profile->last_played_date = $today;
+        $profile->save();
+
+        return (int) $profile->streak;
     }
 
     /**
