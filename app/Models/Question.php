@@ -26,7 +26,7 @@ class Question extends Model
 
     public function sign(): BelongsTo
     {
-        return $this->belongsTo(Sign::class);
+        return $this->belongsTo(Sign::class)->withTrashed();
     }
 
     public function choices(): HasMany

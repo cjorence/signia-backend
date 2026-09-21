@@ -81,6 +81,48 @@ class SignController extends Controller
         ], 200);
     }
 
+    public function archived(): JsonResponse
+    {
+        $levelId = request()->has('level_id') ? request()->integer('level_id') : null;
+        $signs = $this->signService->getArchivedSigns($levelId);
+
+        return response()->json([
+            'success' => true,
+            'data'    => SignResource::collection($signs),
+        ], 200);
+    }
+
+    public function archive(Sign $sign): JsonResponse
+    {
+        $this->signService->archiveSign($sign);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sign archived successfully.',
+        ], 200);
+    }
+
+    public function restore(int $id): JsonResponse
+    {
+        $sign = $this->signService->restoreSign($id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sign restored successfully.',
+            'data'    => new SignResource($sign),
+        ], 200);
+    }
+
+    public function forceDestroy(int $id): JsonResponse
+    {
+        $this->signService->forceDeleteSign($id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sign permanently deleted.',
+        ], 200);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $validated = $request->validate([

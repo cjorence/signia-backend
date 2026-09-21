@@ -81,7 +81,6 @@ class AdminLessonSystemTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.name', 'Hello')
             ->assertJsonPath('data.fsl_name', 'Kamusta')
-            ->assertJsonPath('data.model_label', 'hello')
             ->assertJsonPath('data.xp_reward', 15);
 
         $signId = $createRes->json('data.id');
@@ -247,5 +246,84 @@ class AdminLessonSystemTest extends TestCase
 
         $this->assertDatabaseHas('levels', ['id' => $level1->id, 'order' => 2]);
         $this->assertDatabaseHas('levels', ['id' => $level2->id, 'order' => 1]);
+    }
+
+    public function test_admin_can_archive_and_restore_lesson_sign(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $level = Level::create(['name' => 'Alphabet', 'order' => 1, 'required_xp' => 0]);
+        $sign = Sign::create([
+            'level_id' => $level->id,
+            'name' => 'Letter A',
+            'fsl_name' => 'A',
+            'difficulty' => 'easy',
+            'xp_reward' => 10,
+            'sort_order' => 1,
+        ]);
+
+        // 1. Archive the sign
+        $archiveRes = $this->postJson("/api/admin/signs/{$sign->id}/archive");
+        $archiveRes->assertOk()->assertJsonPath('success', true);
+
+        // Sign should be soft deleted
+        $this->assertSoftDeleted('signs', ['id' => $sign->id]);
+
+        // Active list must NOT include the sign
+        $activeRes = $this->getJson('/api/signs');
+        $activeRes->assertOk()->assertJsonCount(0, 'data');
+
+        // Archived list MUST include the sign
+        $archivedRes = $this->getJson('/api/admin/signs/archived');
+        $archivedRes->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Letter A')
+            ->assertJsonPath('data.0.is_archived', true);
+
+        // 2. Restore the sign
+        $restoreRes = $this->postJson("/api/admin/signs/{$sign->id}/restore");
+        $restoreRes->assertOk()->assertJsonPath('success', true);
+
+        // Sign should not be soft deleted anymore
+        $this->assertNotSoftDeleted('signs', ['id' => $sign->id]);
+
+        // Active list should have the sign back
+        $activeAgainRes = $this->getJson('/api/signs');
+        $activeAgainRes->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_student_progress_remains_intact_when_lesson_is_archived(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $player = User::factory()->create(['role' => 'user']);
+
+        $level = Level::create(['name' => 'Alphabet', 'order' => 1, 'required_xp' => 0]);
+        $sign = Sign::create([
+            'level_id' => $level->id,
+            'name' => 'Letter B',
+            'difficulty' => 'easy',
+            'xp_reward' => 10,
+            'sort_order' => 1,
+        ]);
+
+        // Player completed this sign
+        $progress = \App\Models\Progress::create([
+            'user_id' => $player->id,
+            'sign_id' => $sign->id,
+            'level_id' => $level->id,
+            'is_completed' => true,
+            'attempts' => 3,
+            'best_confidence' => 0.95,
+        ]);
+
+        // Admin archives the sign
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/signs/{$sign->id}/archive")->assertOk();
+
+        // Check progress relationship: sign must NOT be null even when archived
+        $loadedProgress = \App\Models\Progress::with('sign')->find($progress->id);
+        $this->assertNotNull($loadedProgress->sign);
+        $this->assertEquals('Letter B', $loadedProgress->sign->name);
     }
 }

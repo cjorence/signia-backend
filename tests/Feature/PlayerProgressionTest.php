@@ -36,8 +36,8 @@ class PlayerProgressionTest extends TestCase
             'user_id' => $user->id,
             'sign_id' => $sign->id,
             'level_id' => $level->id,
-            'expected_sign' => $sign->model_label,
-            'predicted_sign' => $sign->model_label,
+            'expected_sign' => $sign->model_label ?? $sign->fsl_name ?? $sign->name,
+            'predicted_sign' => $sign->model_label ?? $sign->fsl_name ?? $sign->name,
             'confidence' => 95,
             'is_correct' => true,
         ]);
@@ -48,7 +48,7 @@ class PlayerProgressionTest extends TestCase
             'sign_id' => $sign->id,
             'question_text' => 'Identify the sign.',
             'question_type' => 'mcq',
-            'correct_answer' => $sign->model_label,
+            'correct_answer' => $sign->model_label ?? $sign->fsl_name ?? $sign->name,
         ]);
 
         QuizAttempt::create([

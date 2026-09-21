@@ -88,10 +88,57 @@ class SignService
     }
 
     /**
-     * Delete a sign.
+     * Get all archived (soft-deleted) signs.
      */
-    public function deleteSign(Sign $sign): bool
+    public function getArchivedSigns(?int $levelId = null): Collection
     {
+        $query = Sign::onlyTrashed()
+                     ->with('level')
+                     ->orderBy('level_id')
+                     ->orderBy('sort_order')
+                     ->orderBy('id');
+
+        if ($levelId) {
+            $query->where('level_id', $levelId);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Archive a sign (soft delete, preserves media files for restoration).
+     */
+    public function archiveSign(Sign $sign): bool
+    {
+        return (bool) $sign->delete();
+    }
+
+    /**
+     * Restore an archived sign.
+     */
+    public function restoreSign(int $signId): Sign
+    {
+        $sign = Sign::onlyTrashed()->findOrFail($signId);
+        $sign->restore();
+
+        return $sign->fresh()->load('level');
+    }
+
+    /**
+     * Permanently delete a sign and its media files.
+     */
+    public function forceDeleteSign(int $signId): bool
+    {
+        $sign = Sign::withTrashed()->findOrFail($signId);
+
+        // Safety check: ensure no student progress or logs are tied to this sign
+        if (\App\Models\Progress::where('sign_id', $signId)->exists() ||
+            \App\Models\GestureLog::where('sign_id', $signId)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'sign' => 'This lesson cannot be permanently deleted because student progress or attempt history is attached to it. Please keep it archived instead.',
+            ]);
+        }
+
         if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
             Storage::disk('public')->delete($sign->image_url);
         }
@@ -100,7 +147,15 @@ class SignService
             Storage::disk('public')->delete($sign->video_url);
         }
 
-        return (bool) $sign->delete();
+        return (bool) $sign->forceDelete();
+    }
+
+    /**
+     * Delete a sign (permanent if no student records exist, or forceDelete).
+     */
+    public function deleteSign(Sign $sign): bool
+    {
+        return $this->forceDeleteSign($sign->id);
     }
 
     /**

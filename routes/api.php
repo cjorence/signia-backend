@@ -117,7 +117,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/levels/{level}', [LevelController::class, 'destroy']);
 
         // Signs
+        Route::get('/signs/archived', [SignController::class, 'archived']);
         Route::post('/signs/reorder', [SignController::class, 'reorder']);
+        Route::post('/signs/{sign}/archive', [SignController::class, 'archive']);
+        Route::post('/signs/{id}/restore', [SignController::class, 'restore']);
+        Route::delete('/signs/{id}/force', [SignController::class, 'forceDestroy']);
         Route::post('/signs', [SignController::class, 'store']);
         Route::put('/signs/{sign}', [SignController::class, 'update']);
         Route::delete('/signs/{sign}', [SignController::class, 'destroy']);
