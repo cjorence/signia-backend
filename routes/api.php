@@ -111,7 +111,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('admin')->prefix('admin')->group(function () {
 
         // Levels
+        Route::get('/levels/archived', [LevelController::class, 'archived']);
         Route::post('/levels/reorder', [LevelController::class, 'reorder']);
+        Route::post('/levels/{level}/archive', [LevelController::class, 'archive']);
+        Route::post('/levels/{id}/restore', [LevelController::class, 'restore']);
+        Route::delete('/levels/{id}/force', [LevelController::class, 'forceDestroy']);
         Route::post('/levels', [LevelController::class, 'store']);
         Route::put('/levels/{level}', [LevelController::class, 'update']);
         Route::delete('/levels/{level}', [LevelController::class, 'destroy']);

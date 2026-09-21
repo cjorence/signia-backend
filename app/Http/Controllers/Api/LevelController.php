@@ -69,6 +69,47 @@ class LevelController extends Controller
         ], 200);
     }
 
+    public function archived(): JsonResponse
+    {
+        $levels = $this->levelService->getArchivedLevels();
+
+        return response()->json([
+            'success' => true,
+            'data'    => LevelResource::collection($levels),
+        ], 200);
+    }
+
+    public function archive(Level $level): JsonResponse
+    {
+        $this->levelService->archiveLevel($level);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Level archived successfully.',
+        ], 200);
+    }
+
+    public function restore(int $id): JsonResponse
+    {
+        $level = $this->levelService->restoreLevel($id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Level restored successfully.',
+            'data'    => new LevelResource($level),
+        ], 200);
+    }
+
+    public function forceDestroy(int $id): JsonResponse
+    {
+        $this->levelService->forceDeleteLevel($id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Level permanently deleted.',
+        ], 200);
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $validated = $request->validate([

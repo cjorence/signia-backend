@@ -326,4 +326,40 @@ class AdminLessonSystemTest extends TestCase
         $this->assertNotNull($loadedProgress->sign);
         $this->assertEquals('Letter B', $loadedProgress->sign->name);
     }
+
+    public function test_admin_can_archive_and_restore_category_level(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $level = Level::create(['name' => 'FSL Numbers', 'order' => 1, 'required_xp' => 0]);
+
+        // 1. Archive category
+        $archiveRes = $this->postJson("/api/admin/levels/{$level->id}/archive");
+        $archiveRes->assertOk()->assertJsonPath('success', true);
+
+        // Should be soft-deleted
+        $this->assertSoftDeleted('levels', ['id' => $level->id]);
+
+        // Active levels endpoint must not show it
+        $activeRes = $this->getJson('/api/levels');
+        $activeRes->assertOk()->assertJsonCount(0, 'data');
+
+        // Archived levels endpoint must show it
+        $archivedRes = $this->getJson('/api/admin/levels/archived');
+        $archivedRes->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'FSL Numbers')
+            ->assertJsonPath('data.0.is_archived', true);
+
+        // 2. Restore category
+        $restoreRes = $this->postJson("/api/admin/levels/{$level->id}/restore");
+        $restoreRes->assertOk()->assertJsonPath('success', true);
+
+        $this->assertNotSoftDeleted('levels', ['id' => $level->id]);
+
+        // Active list should show it again
+        $activeResAgain = $this->getJson('/api/levels');
+        $activeResAgain->assertOk()->assertJsonCount(1, 'data');
+    }
 }

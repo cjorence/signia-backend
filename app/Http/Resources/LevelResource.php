@@ -22,6 +22,8 @@ class LevelResource extends JsonResource
             'quests_count'=> $this->whenCounted('quests'),
             'signs'       => SignResource::collection($this->whenLoaded('signs')),
             'quests'      => QuestResource::collection($this->whenLoaded('quests')),
+            'is_archived' => !is_null($this->deleted_at),
+            'deleted_at'  => $this->deleted_at?->toISOString(),
             'created_at'  => $this->created_at?->toISOString(),
         ];
     }

@@ -44,6 +44,6 @@ class Progress extends Model
 
     public function level(): BelongsTo
     {
-        return $this->belongsTo(Level::class);
+        return $this->belongsTo(Level::class)->withTrashed();
     }
 }
