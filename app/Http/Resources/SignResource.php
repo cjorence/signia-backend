@@ -17,8 +17,12 @@ class SignResource extends JsonResource
             'fsl_name'    => $this->fsl_name,
             'description' => $this->description,
             'image_url'   => $this->formatMediaUrl($this->image_url),
-            'video_url'   => $this->formatMediaUrl($this->video_url),
-            'model_label' => $this->model_label,
+            'video_url'   => $this->video_type === 'youtube'
+                                ? $this->video_url
+                                : $this->formatMediaUrl($this->video_url),
+            'video_type'  => $this->video_type ?? 'local',
+            'video_start' => $this->video_start,
+            'video_end'   => $this->video_end,
             'difficulty'  => $this->difficulty,
             'xp_reward'   => $this->xp_reward,
             'sort_order'  => $this->sort_order,

@@ -40,7 +40,7 @@ class GestureService
 
         // Expected labels are derived from the database. Prediction telemetry is
         // supplied by the browser until the AI service is moved server-side.
-        $expected = strtolower(trim((string) ($sign->model_label ?: $sign->name)));
+        $expected = strtolower(trim((string) ($sign->fsl_name ?: $sign->name)));
         $predicted = strtolower(trim($data['predicted_sign']));
         $confidence = (float) $data['confidence'];
 

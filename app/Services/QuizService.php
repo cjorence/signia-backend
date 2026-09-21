@@ -368,7 +368,7 @@ class QuizService
         $orderedSigns = $level->signs()
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'name', 'fsl_name', 'model_label']);
+            ->get(['id', 'name', 'fsl_name']);
         $currentIndex = $orderedSigns->search(
             fn (Sign $sign) => $sign->id === $question->sign_id
         );
