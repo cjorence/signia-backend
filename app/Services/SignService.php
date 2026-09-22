@@ -18,12 +18,15 @@ class SignService
     public function getAllSigns(?int $levelId = null): Collection
     {
         $query = Sign::with('level')
-                     ->orderBy('level_id')
-                     ->orderBy('sort_order')
-                     ->orderBy('id');
+                     ->select('signs.*')
+                     ->leftJoin('levels', 'levels.id', '=', 'signs.level_id')
+                     ->orderByRaw("CASE levels.difficulty WHEN 'easy' THEN 1 WHEN 'medium' THEN 2 WHEN 'hard' THEN 3 ELSE 4 END ASC")
+                     ->orderBy('levels.order')
+                     ->orderBy('signs.sort_order')
+                     ->orderBy('signs.id');
 
         if ($levelId) {
-            $query->where('level_id', $levelId);
+            $query->where('signs.level_id', $levelId);
         }
 
         return $query->get();
@@ -94,12 +97,15 @@ class SignService
     {
         $query = Sign::onlyTrashed()
                      ->with('level')
-                     ->orderBy('level_id')
-                     ->orderBy('sort_order')
-                     ->orderBy('id');
+                     ->select('signs.*')
+                     ->leftJoin('levels', 'levels.id', '=', 'signs.level_id')
+                     ->orderByRaw("CASE levels.difficulty WHEN 'easy' THEN 1 WHEN 'medium' THEN 2 WHEN 'hard' THEN 3 ELSE 4 END ASC")
+                     ->orderBy('levels.order')
+                     ->orderBy('signs.sort_order')
+                     ->orderBy('signs.id');
 
         if ($levelId) {
-            $query->where('level_id', $levelId);
+            $query->where('signs.level_id', $levelId);
         }
 
         return $query->get();

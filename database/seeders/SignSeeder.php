@@ -20,14 +20,14 @@ class SignSeeder extends Seeder
         $categoryConfig = [
             'NUMBER' => [
                 'level' => 'FSL Numbers',
-                'order' => 3,
+                'order' => 2,
                 'difficulty' => 'easy',
                 'xp_reward' => 10,
                 'model_name'=> 'number'
             ],  
             'GREETING' => [
                 'level' => 'FSL Greetings',
-                'order' => 4,
+                'order' => 3,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
                 'model_name'=>'greeting'
@@ -35,7 +35,7 @@ class SignSeeder extends Seeder
 
             'SURVIVAL' => [
                 'level' => 'FSL Survival',
-                'order' => 5,
+                'order' => 4,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
                 'model_name'=>'survival'
@@ -43,7 +43,7 @@ class SignSeeder extends Seeder
 
             'CALENDAR' => [
                 'level' => 'FSL Calendar',
-                'order' => 6,
+                'order' => 5,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'calendar'
@@ -51,7 +51,7 @@ class SignSeeder extends Seeder
 
             'DAYS' => [
                 'level' => 'FSL Days',
-                'order' => 7,
+                'order' => 6,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'days'
@@ -59,7 +59,7 @@ class SignSeeder extends Seeder
 
             'FAMILY' => [
                 'level' => 'FSL Family',
-                'order' => 8,
+                'order' => 7,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
                 'model_name'=>'family'
@@ -67,7 +67,7 @@ class SignSeeder extends Seeder
 
             'RELATIONSHIPS' => [
                 'level' => 'FSL Relationships',
-                'order' => 9,
+                'order' => 8,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
                 'model_name'=>'relationships'
@@ -75,7 +75,7 @@ class SignSeeder extends Seeder
 
             'COLOR' => [
                 'level' => 'FSL Colors',
-                'order' => 10,
+                'order' => 9,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'color'
@@ -83,7 +83,7 @@ class SignSeeder extends Seeder
 
             'FOOD' => [
                 'level' => 'FSL Food',
-                'order' => 11,
+                'order' => 10,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'food'
@@ -91,7 +91,7 @@ class SignSeeder extends Seeder
 
             'DRINK' => [
                 'level' => 'FSL Drinks',
-                'order' => 12,
+                'order' => 11,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'drink'
@@ -99,7 +99,7 @@ class SignSeeder extends Seeder
 
             'PRONOUN' => [
                 'level' => 'FSL Pronouns',
-                'order' => 13,
+                'order' => 12,
                 'difficulty' => 'medium',
                 'xp_reward' => 10,
                 'model_name'=>'pronoun'
@@ -107,7 +107,7 @@ class SignSeeder extends Seeder
 
             'COMMUNICATION' => [
                 'level' => 'FSL Communication',
-                'order' => 14,
+                'order' => 13,
                 'difficulty' => 'medium',
                 'xp_reward' => 15,
                 'model_name'=>'communication'
@@ -137,6 +137,7 @@ class SignSeeder extends Seeder
                 ],
                 [
                     'order' => $config['order'],
+                    'difficulty' => $config['difficulty'],
                 ]
             );
         }
@@ -157,6 +158,7 @@ class SignSeeder extends Seeder
             ],
             [
                 'order' => 1,
+                'difficulty' => 'easy',
             ]
         );
 
