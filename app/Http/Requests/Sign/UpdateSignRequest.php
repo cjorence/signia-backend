@@ -18,6 +18,7 @@ class UpdateSignRequest extends FormRequest
             'level_id'    => ['sometimes', 'required', 'integer', 'exists:levels,id'],
             'name'        => ['sometimes', 'required', 'string', 'max:255'],
             'fsl_name'    => ['nullable', 'string', 'max:255'],
+            'model_label' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'image'       => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
             'video'       => ['nullable', 'file', 'mimes:mp4,mov,avi,webm,mkv', 'max:51200'],

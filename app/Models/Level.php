@@ -17,7 +17,6 @@ class Level extends Model
         'difficulty',
         'order',
         'required_xp',
-        'mode_level',
     ];
 
     protected function casts(): array

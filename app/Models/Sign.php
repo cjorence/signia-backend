@@ -25,6 +25,7 @@ class Sign extends Model
         'difficulty',
         'xp_reward',
         'sort_order',
+        'model_label',
     ];
 
     protected function casts(): array
