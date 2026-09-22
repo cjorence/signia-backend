@@ -136,8 +136,7 @@ class SignSeeder extends Seeder
                     'name' => $config['level'],
                 ],
                 [
-                    'order'      => $config['order'],
-                    'mode_level' => $config['model_name'] ?? null,
+                    'order' => $config['order'],
                 ]
             );
         }
@@ -158,7 +157,6 @@ class SignSeeder extends Seeder
             ],
             [
                 'order' => 1,
-                'mode_level' => 'alphabet',
             ]
         );
 
@@ -226,6 +224,7 @@ class SignSeeder extends Seeder
                 ],
                 [
                     'fsl_name' => $letter,
+                    'model_label' => 'alphabet',
                     'description' => $description,
                     'difficulty' => 'easy',
                     'xp_reward' => 10,
@@ -236,7 +235,7 @@ class SignSeeder extends Seeder
 
                     // Alphabet uses image instead of video
                     'video_url' => null,
-                    'image_url' => "/storage/videos/signs/images/{$letter}.png",
+                    'image_url' => "/storage/signs/images/{$letter}.png",
                 ]
             );
 
@@ -430,6 +429,7 @@ class SignSeeder extends Seeder
                 ],
                 [
                     'fsl_name'    => $label,
+                    'model_label' => $config['model_name'] ?? null,
                     'description' => "FSL sign for {$displayName}.",
                     'difficulty'  => $config['difficulty'],
                     'xp_reward'   => $config['xp_reward'],

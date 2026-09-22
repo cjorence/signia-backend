@@ -16,8 +16,6 @@ class LevelResource extends JsonResource
             'difficulty'  => $this->difficulty ?? 'easy',
             'order'       => $this->order,
             'required_xp' => $this->required_xp,
-            'mode_level'  => $this->mode_level ?? 'alphabet',
-            'mode'        => $this->mode_level ?? 'alphabet',
             'signs_count' => $this->whenCounted('signs'),
             'quests_count'=> $this->whenCounted('quests'),
             'signs'       => SignResource::collection($this->whenLoaded('signs')),
