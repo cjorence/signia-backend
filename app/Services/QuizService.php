@@ -343,9 +343,14 @@ class QuizService
 
     private function attachLessonOptions(\Illuminate\Support\Collection|Collection $quizzes, Level $level): \Illuminate\Support\Collection|Collection
     {
+        $orderedSigns = $level->signs()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name', 'fsl_name']);
+
         foreach ($quizzes as $quiz) {
             foreach ($quiz->questions as $question) {
-                $question->setAttribute('lesson_options', $this->lessonOptionsForQuestion($question, $level));
+                $question->setAttribute('lesson_options', $this->lessonOptionsForQuestion($question, $orderedSigns));
             }
         }
 
@@ -359,16 +364,22 @@ class QuizService
      * This keeps a displayed option valid when the player submits it; the
      * frontend is responsible for shuffling the visual order per attempt.
      */
-    private function lessonOptionsForQuestion(Question $question, Level $level): array
+    private function lessonOptionsForQuestion(
+        Question $question,
+        Level|\Illuminate\Support\Collection|Collection $levelOrSigns
+    ): array
     {
         if (! $question->sign_id) {
             return [];
         }
 
-        $orderedSigns = $level->signs()
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id', 'name', 'fsl_name']);
+        $orderedSigns = $levelOrSigns instanceof Level
+            ? $levelOrSigns->signs()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(['id', 'name', 'fsl_name'])
+            : $levelOrSigns;
+
         $currentIndex = $orderedSigns->search(
             fn (Sign $sign) => $sign->id === $question->sign_id
         );

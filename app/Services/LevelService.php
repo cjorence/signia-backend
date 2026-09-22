@@ -13,6 +13,7 @@ class LevelService
     public function getAllLevels(): Collection
     {
         return Level::withCount(['signs', 'quests'])
+                    ->with(['signs' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
                     ->orderByRaw("CASE difficulty WHEN 'easy' THEN 1 WHEN 'medium' THEN 2 WHEN 'hard' THEN 3 ELSE 4 END ASC")
                     ->orderBy('order')
                     ->get();
