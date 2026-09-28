@@ -15,6 +15,7 @@ class Level extends Model
         'name',
         'description',
         'difficulty',
+        'question_prompt',
         'order',
         'required_xp',
     ];

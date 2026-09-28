@@ -39,9 +39,24 @@ class QuizService
             ->pluck('sign_id')
             ->all();
 
-        $isAlphabet = str_contains(strtolower($quiz->title), 'alphabet')
-            || str_contains(strtolower($level->name), 'alphabet');
-        $questionText = $isAlphabet ? 'What alphabet letter is shown?' : 'What sign is shown?';
+        $questionText = $this->resolveQuestionPromptForLevel($level);
+        $allLevelQuizIds = $level->quizzes()->pluck('id');
+
+        // Keep auto-generated/standard sign questions synchronized with the level's prompt
+        if ($allLevelQuizIds->isNotEmpty()) {
+            Question::whereIn('quiz_id', $allLevelQuizIds)
+                ->whereNotNull('sign_id')
+                ->where(function ($q) use ($questionText) {
+                    $q->where('question_text', '!=', $questionText)
+                      ->whereIn('question_text', [
+                          'What sign is shown?',
+                          'What alphabet letter is shown?',
+                          'What number is being signed?',
+                          'What sign or expression is being shown?',
+                      ]);
+                })
+                ->update(['question_text' => $questionText]);
+        }
 
         foreach ($signs as $sign) {
             if (! in_array($sign->id, $existingSignIds)) {
@@ -405,6 +420,26 @@ class QuizService
             ])
             ->values()
             ->all();
+    }
+
+    public function resolveQuestionPromptForLevel(Level $level): string
+    {
+        if (!empty($level->question_prompt)) {
+            return trim($level->question_prompt);
+        }
+
+        $name = strtolower($level->name);
+
+        $subject = match (true) {
+            str_contains($name, 'alphabet') => 'letter',
+            str_contains($name, 'number')   => 'number',
+            str_contains($name, 'greeting') => 'greeting',
+            str_contains($name, 'phrase')   => 'phrase',
+            str_contains($name, 'color')    => 'color',
+            default                         => 'sign',
+        };
+
+        return "What {$subject} is shown?";
     }
 
     public function __construct(

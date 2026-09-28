@@ -12,9 +12,10 @@ class LevelResource extends JsonResource
         return [
             'id'          => $this->id,
             'name'        => $this->name,
-            'description' => $this->description,
-            'difficulty'  => $this->difficulty ?? 'easy',
-            'order'       => $this->order,
+            'description'     => $this->description,
+            'difficulty'      => $this->difficulty ?? 'easy',
+            'question_prompt' => $this->question_prompt,
+            'order'           => $this->order,
             'required_xp' => $this->required_xp,
             'signs_count' => $this->whenCounted('signs'),
             'quests_count'=> $this->whenCounted('quests'),

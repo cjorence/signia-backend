@@ -17,9 +17,10 @@ class StoreLevelRequest extends FormRequest
         return [
             'name'        => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'difficulty'  => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
-            'order'       => ['nullable', 'integer', 'min:0'],
-            'required_xp' => ['nullable', 'integer', 'min:0'],
+            'difficulty'      => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
+            'question_prompt' => ['nullable', 'string', 'max:255'],
+            'order'           => ['nullable', 'integer', 'min:0'],
+            'required_xp'     => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

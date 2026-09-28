@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Level;
+use App\Models\Question;
 use Illuminate\Database\Eloquent\Collection;
 
 class LevelService
@@ -53,6 +54,16 @@ class LevelService
     public function updateLevel(Level $level, array $data): Level
     {
         $level->update($data);
+
+        if (array_key_exists('question_prompt', $data) || array_key_exists('name', $data)) {
+            $prompt = app(QuizService::class)->resolveQuestionPromptForLevel($level);
+            $quizIds = $level->quizzes()->pluck('id');
+            if ($quizIds->isNotEmpty()) {
+                Question::whereIn('quiz_id', $quizIds)
+                    ->whereNotNull('sign_id')
+                    ->update(['question_text' => $prompt]);
+            }
+        }
 
         return $level->fresh();
     }

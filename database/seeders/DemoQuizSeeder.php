@@ -60,7 +60,7 @@ class DemoQuizSeeder extends Seeder
             $question = Question::create([
                 'quiz_id' => $quiz->id,
                 'sign_id' => $sign->id,
-                'question_text' => 'What alphabet letter is shown?',
+                'question_text' => 'What letter is shown?',
                 'question_type' => 'mcq',
                 'correct_answer' => $letter,
             ]);
@@ -121,7 +121,7 @@ class DemoQuizSeeder extends Seeder
             $question = Question::create([
                 'quiz_id' => $quiz->id,
                 'sign_id' => $sign->id,
-                'question_text' => 'What number is being signed?',
+                'question_text' => 'What number is shown?',
                 'question_type' => 'mcq',
                 'correct_answer' => $number,
             ]);
@@ -181,7 +181,7 @@ class DemoQuizSeeder extends Seeder
             $question = Question::create([
                 'quiz_id' => $quiz->id,
                 'sign_id' => $sign->id,
-                'question_text' => 'What sign or expression is being shown?',
+                'question_text' => 'What greeting is shown?',
                 'question_type' => 'mcq',
                 'correct_answer' => $greetingName,
             ]);
