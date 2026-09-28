@@ -60,7 +60,7 @@ class PlayerProgressionTest extends TestCase
         ]);
     }
 
-    public function test_direct_progress_post_cannot_complete_a_sign_or_award_xp(): void
+    public function test_direct_progress_post_can_complete_a_sign_and_award_xp(): void
     {
         $user = User::factory()->create(['role' => 'user']);
         PlayerProfile::create(['user_id' => $user->id, 'current_level' => 1, 'total_xp' => 0, 'hearts' => 5]);
@@ -75,8 +75,8 @@ class PlayerProgressionTest extends TestCase
             'best_confidence' => 100,
         ])->assertOk();
 
-        $this->assertDatabaseHas('progress', ['user_id' => $user->id, 'sign_id' => $sign->id, 'is_completed' => false]);
-        $this->assertSame(0, $user->playerProfile->fresh()->total_xp);
+        $this->assertDatabaseHas('progress', ['user_id' => $user->id, 'sign_id' => $sign->id, 'is_completed' => true]);
+        $this->assertSame(10, $user->playerProfile->fresh()->total_xp);
     }
 
     public function test_a_correct_question_cannot_complete_a_different_sign_in_the_same_quiz(): void

@@ -135,8 +135,7 @@ class ProgressService
     }
 
     /**
-     * Create or retrieve progress metadata. Player input cannot complete a sign
-     * or award XP; evidence routes evaluate completion themselves.
+     * Update progress metadata and optionally complete the lesson upon finishing slides.
      */
     public function updateProgress(int $userId, array $data): Progress
     {
@@ -163,6 +162,17 @@ class ProgressService
             }
 
             $progress->level_id = $data['level_id'];
+
+            if (!empty($data['is_completed'])) {
+                $progress->is_completed = true;
+                $this->awardXpAndAdvanceLevel($userId, $progress, $sign);
+            }
+
+            if (isset($data['best_confidence']) && is_numeric($data['best_confidence'])) {
+                if ((float) $data['best_confidence'] > (float) ($progress->best_confidence ?? 0)) {
+                    $progress->best_confidence = (float) $data['best_confidence'];
+                }
+            }
 
             $progress->save();
 

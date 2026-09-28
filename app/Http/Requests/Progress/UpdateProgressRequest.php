@@ -16,6 +16,8 @@ class UpdateProgressRequest extends FormRequest
         return [
             'sign_id'         => ['required', 'integer', 'exists:signs,id'],
             'level_id'        => ['required', 'integer', 'exists:levels,id'],
+            'is_completed'    => ['sometimes', 'boolean'],
+            'best_confidence' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }
 
