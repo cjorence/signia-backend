@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\StoryController;
 use App\Http\Controllers\Api\AdminStoryController;
 use App\Http\Controllers\Api\FinisherController;
+use App\Http\Controllers\Api\UserActivityController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -90,6 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('user')->group(function () {
+        Route::get('/activities', [UserActivityController::class, 'index']);
         Route::get('/hearts', [HeartController::class, 'status']);
         Route::get('/hearts/transactions', [HeartController::class, 'transactions']);
         Route::post('/hearts/refill', [HeartController::class, 'refill']);
