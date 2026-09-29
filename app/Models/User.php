@@ -104,6 +104,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(HeartTransaction::class);
     }
+
+    public function storyProgress(): HasMany
+    {
+        return $this->hasMany(UserStoryProgress::class);
+    }
     
     // ========================
     // HELPERS

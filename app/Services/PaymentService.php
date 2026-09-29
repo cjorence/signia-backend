@@ -281,7 +281,7 @@ class PaymentService
         try {
             $response = Http::acceptJson()
                 ->withBasicAuth($secretKey, '')
-                ->get(rtrim((string) config('services.paymongo.api_url'), '/').'/v2/checkout_sessions/'.$purchase->checkout_session_id);
+                ->get(rtrim((string) config('services.paymongo.api_url'), '/').'/v1/checkout_sessions/'.$purchase->checkout_session_id);
 
             if ($response->successful()) {
                 $sessionData = $response->json('data.attributes');

@@ -21,6 +21,10 @@ class UserResource extends JsonResource
                 isset($this->signs_learned_count),
                 (int) $this->signs_learned_count
             ),
+            'stories_done_count' => $this->when(
+                isset($this->stories_done_count),
+                (int) $this->stories_done_count
+            ),
             'created_at'      => $this->created_at?->toISOString(),
         ];
     }

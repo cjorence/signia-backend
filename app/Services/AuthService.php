@@ -81,6 +81,7 @@ class AuthService
             ->load('playerProfile')
             ->loadCount([
                 'progress as signs_learned_count' => fn ($query) => $query->where('is_completed', true),
+                'storyProgress as stories_done_count' => fn ($query) => $query->where('status', 'completed'),
             ]);
     }
 }

@@ -56,10 +56,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
     });
 
-    // User quest progress
+    // User profile & quest progress
     Route::prefix('user')->group(function () {
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
         Route::get('/quests', [UserQuestController::class, 'index']);
         Route::post('/quests', [UserQuestController::class, 'updateStatus']);
     });
