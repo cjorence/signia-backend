@@ -52,6 +52,11 @@ class PayMongoCheckoutTest extends TestCase
             'checkout_session_id' => 'cs_test_heart_pack',
             'status' => 'pending',
         ]);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.paymongo.test/v2/checkout_sessions'
+                && $request['data']['attributes']['payment_method_types'] === ['card', 'gcash', 'paymaya', 'grab_pay'];
+        });
     }
 
     public function test_valid_paid_webhook_credits_inventory_once(): void

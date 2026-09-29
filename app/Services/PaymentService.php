@@ -47,6 +47,11 @@ class PaymentService
             $cancelUrl = $frontendUrl.'/player/store?payment=cancelled&purchase_id='.$purchase->id;
         }
 
+        $paymentMethodTypes = (array) config('services.paymongo.payment_method_types', ['card', 'gcash', 'paymaya', 'grab_pay']);
+        if (empty($paymentMethodTypes)) {
+            $paymentMethodTypes = ['card', 'gcash', 'paymaya', 'grab_pay'];
+        }
+
         try {
             $response = Http::acceptJson()
                 ->asJson()
@@ -60,7 +65,7 @@ class PaymentService
                                 'currency' => $purchase->currency,
                                 'quantity' => 1,
                             ]],
-                            'payment_method_types' => ['card'],
+                            'payment_method_types' => $paymentMethodTypes,
                             'success_url' => $successUrl,
                             'cancel_url' => $cancelUrl,
                             'reference_number' => $referenceNumber,

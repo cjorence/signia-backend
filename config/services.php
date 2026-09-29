@@ -41,6 +41,7 @@ return [
         'mode' => env('PAYMONGO_MODE', 'test'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
         'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+        'payment_method_types' => array_values(array_filter(explode(',', (string) env('PAYMONGO_PAYMENT_METHOD_TYPES', 'card,gcash,paymaya,grab_pay')))),
     ],
 
 ];
