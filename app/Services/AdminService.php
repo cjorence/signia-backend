@@ -21,6 +21,14 @@ class AdminService
     public function getUsers(): Collection
     {
         return User::with('playerProfile')
+            ->withCount([
+                'progress as signs_learned_count' => function ($query) {
+                    $query->where('is_completed', true);
+                },
+                'storyProgress as stories_done_count' => function ($query) {
+                    $query->where('status', 'completed');
+                },
+            ])
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -49,6 +57,10 @@ class AdminService
 
     public function deactivateUser(User $admin, User $user): User
     {
+        if ($admin->id === $user->id) {
+            abort(400, 'You cannot deactivate your own account.');
+        }
+
         $user->update([
             'is_active' => false,
         ]);

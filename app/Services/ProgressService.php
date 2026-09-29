@@ -9,6 +9,7 @@ use App\Models\Progress;
 use App\Models\Question;
 use App\Models\QuizAttempt;
 use App\Models\Sign;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -166,6 +167,7 @@ class ProgressService
             if (!empty($data['is_completed'])) {
                 $progress->is_completed = true;
                 $this->awardXpAndAdvanceLevel($userId, $progress, $sign);
+                $this->triggerAchievementCheck($userId);
             }
 
             if (isset($data['best_confidence']) && is_numeric($data['best_confidence'])) {
@@ -201,6 +203,7 @@ class ProgressService
             $progress->is_completed = true;
             $this->awardXpAndAdvanceLevel($userId, $progress, $sign);
             $progress->save();
+            $this->triggerAchievementCheck($userId);
 
             return $progress->load(['sign', 'level']);
         });
@@ -324,5 +327,20 @@ class ProgressService
                              ->count();
 
         return round(($completed / $totalSigns) * 100, 2);
+    }
+
+    /**
+     * Non-blocking trigger to evaluate and unlock newly met achievements.
+     */
+    protected function triggerAchievementCheck(int $userId): void
+    {
+        try {
+            $user = User::find($userId);
+            if ($user) {
+                app(AchievementService::class)->checkAndUnlock($user);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

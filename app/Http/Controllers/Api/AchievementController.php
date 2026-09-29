@@ -27,6 +27,11 @@ class AchievementController extends Controller
 
     public function userAchievements(): JsonResponse
     {
+        $user = Auth::user();
+        if ($user) {
+            $this->achievementService->checkAndUnlock($user);
+        }
+
         $achievements = $this->achievementService->getUserAchievements(Auth::id());
 
         return response()->json([

@@ -159,8 +159,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // User management
         Route::get('/users', [AdminController::class, 'users']);
         Route::get('/users/{user}', [AdminController::class, 'showUser']);
-        Route::patch('/users/{user}/activate', [AdminController::class, 'activateUser']);
-        Route::patch('/users/{user}/deactivate', [AdminController::class, 'deactivateUser']);
+        Route::match(['patch', 'post'], '/users/{user}/activate', [AdminController::class, 'activateUser']);
+        Route::match(['patch', 'post'], '/users/{user}/deactivate', [AdminController::class, 'deactivateUser']);
 
         Route::get('/purchases', [PurchaseController::class, 'adminPurchases']);
         Route::get('/revenue/summary', [PurchaseController::class, 'revenueSummary']);
