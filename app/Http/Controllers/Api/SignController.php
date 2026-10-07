@@ -94,7 +94,9 @@ class SignController extends Controller
 
     public function archive(Sign $sign): JsonResponse
     {
+        $reason = request()->input('reason');
         $this->signService->archiveSign($sign);
+        \App\Services\CurriculumEventService::record('lesson-archived', $sign->id, $sign->name, $reason);
 
         return response()->json([
             'success' => true,
@@ -105,6 +107,7 @@ class SignController extends Controller
     public function restore(int $id): JsonResponse
     {
         $sign = $this->signService->restoreSign($id);
+        \App\Services\CurriculumEventService::record('lesson-restored', $sign->id, $sign->name);
 
         return response()->json([
             'success' => true,

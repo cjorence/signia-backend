@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\StoryController;
 use App\Http\Controllers\Api\AdminStoryController;
 use App\Http\Controllers\Api\FinisherController;
 use App\Http\Controllers\Api\UserActivityController;
+use App\Http\Controllers\Api\CurriculumEventController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -45,6 +46,7 @@ Route::get('/stories/package', [StoryController::class, 'package']);
 Route::get('/stories/{story}', [StoryController::class, 'show']);
 Route::post('/stories/verify-ticket', [StoryController::class, 'verifyTicket']);
 Route::get('/finishers', [FinisherController::class, 'index']);
+Route::get('/curriculum/events', [CurriculumEventController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------

@@ -81,7 +81,9 @@ class LevelController extends Controller
 
     public function archive(Level $level): JsonResponse
     {
+        $reason = request()->input('reason');
         $this->levelService->archiveLevel($level);
+        \App\Services\CurriculumEventService::record('category-archived', $level->id, $level->name, $reason);
 
         return response()->json([
             'success' => true,
@@ -92,6 +94,7 @@ class LevelController extends Controller
     public function restore(int $id): JsonResponse
     {
         $level = $this->levelService->restoreLevel($id);
+        \App\Services\CurriculumEventService::record('category-restored', $level->id, $level->name);
 
         return response()->json([
             'success' => true,
