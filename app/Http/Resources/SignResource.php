@@ -45,6 +45,14 @@ class SignResource extends JsonResource
         }
 
         $cleanPath = ltrim($url, '/');
+        $relativeDiskPath = str_starts_with($cleanPath, 'storage/')
+            ? substr($cleanPath, 8)
+            : $cleanPath;
+
+        if (!Storage::disk('public')->exists($relativeDiskPath)) {
+            return null;
+        }
+
         if (!str_starts_with($cleanPath, 'storage/')) {
             $cleanPath = 'storage/' . $cleanPath;
         }

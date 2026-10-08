@@ -129,6 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Signs
         Route::get('/signs/archived', [SignController::class, 'archived']);
         Route::post('/signs/reorder', [SignController::class, 'reorder']);
+        Route::post('/signs/convert-video', [SignController::class, 'convertVideo']);
         Route::post('/signs/{sign}/archive', [SignController::class, 'archive']);
         Route::post('/signs/{id}/restore', [SignController::class, 'restore']);
         Route::delete('/signs/{id}/force', [SignController::class, 'forceDestroy']);

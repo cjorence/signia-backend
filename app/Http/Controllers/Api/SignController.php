@@ -141,4 +141,27 @@ class SignController extends Controller
             'message' => 'Signs reordered successfully.',
         ], 200);
     }
+
+    public function convertVideo(Request $request)
+    {
+        $request->validate([
+            'video' => ['required', 'file', 'max:102400'],
+        ]);
+
+        $file = $request->file('video');
+        $transcodedPath = $this->signService->transcodeVideoFile($file->getRealPath());
+
+        if (!$transcodedPath || !file_exists($transcodedPath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Video conversion failed. Ensure FFmpeg is available on the server.',
+            ], 422);
+        }
+
+        $downloadName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME) . '.mp4';
+
+        return response()->download($transcodedPath, $downloadName, [
+            'Content-Type' => 'video/mp4',
+        ])->deleteFileAfterSend(true);
+    }
 }

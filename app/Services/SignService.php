@@ -181,11 +181,88 @@ class SignService
             if ($existingSign?->video_url && Storage::disk('public')->exists($existingSign->video_url)) {
                 Storage::disk('public')->delete($existingSign->video_url);
             }
-            $data['video_url'] = $data['video']->store('signs/videos', 'public');
+            $storedPath = $data['video']->store('signs/videos', 'public');
+            $this->optimizeVideoWithFfmpeg($storedPath);
+            $data['video_url'] = $storedPath;
         }
         unset($data['video']);
 
         return $data;
+    }
+
+    /**
+     * Transcode uploaded video to web-standard H.264 using FFmpeg if available.
+     */
+    protected function optimizeVideoWithFfmpeg(string $relativeStoragePath): void
+    {
+        try {
+            $disk = Storage::disk('public');
+            $fullPath = $disk->path($relativeStoragePath);
+            if (!file_exists($fullPath)) {
+                return;
+            }
+
+            // Verify ffmpeg exists in environment
+            exec('ffmpeg -version', $checkOut, $checkRet);
+            if ($checkRet !== 0) {
+                return;
+            }
+
+            $tempPath = $fullPath . '.tmp.mp4';
+            $cmd = sprintf(
+                'ffmpeg -y -i %s -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac %s 2>&1',
+                escapeshellarg($fullPath),
+                escapeshellarg($tempPath)
+            );
+
+            exec($cmd, $ffmpegOut, $ffmpegRet);
+            if ($ffmpegRet === 0 && file_exists($tempPath) && filesize($tempPath) > 0) {
+                @unlink($fullPath);
+                @rename($tempPath, $fullPath);
+            } elseif (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Video optimization failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Transcode any video file to a temporary web-standard H.264 MP4 file.
+     * Returns the path to the converted MP4, or null on failure.
+     */
+    public function transcodeVideoFile(string $inputPath): ?string
+    {
+        try {
+            if (!file_exists($inputPath)) {
+                return null;
+            }
+
+            exec('ffmpeg -version', $checkOut, $checkRet);
+            if ($checkRet !== 0) {
+                return null;
+            }
+
+            $tempPath = tempnam(sys_get_temp_dir(), 'sig_') . '.mp4';
+            $cmd = sprintf(
+                'ffmpeg -y -i %s -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac %s 2>&1',
+                escapeshellarg($inputPath),
+                escapeshellarg($tempPath)
+            );
+
+            exec($cmd, $ffmpegOut, $ffmpegRet);
+            if ($ffmpegRet === 0 && file_exists($tempPath) && filesize($tempPath) > 0) {
+                return $tempPath;
+            }
+
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Video transcoding failed: ' . $e->getMessage());
+        }
+
+        return null;
     }
 
     /**

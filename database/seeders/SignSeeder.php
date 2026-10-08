@@ -219,6 +219,28 @@ class SignSeeder extends Seeder
         $alphabetOrder = 1;
 
         foreach ($alphabetDescriptions as $letter => $description) {
+            $existing = Sign::where('level_id', $alphabetLevel->id)
+                ->where('name', "Letter {$letter}")
+                ->first();
+
+            // Detect image on disk (.webp, .png, .jpg)
+            $detectedImage = null;
+            foreach (['webp', 'png', 'jpg'] as $ext) {
+                if (file_exists(storage_path("app/public/signs/images/{$letter}.{$ext}"))) {
+                    $detectedImage = "/storage/signs/images/{$letter}.{$ext}";
+                    break;
+                }
+            }
+
+            // Detect video on disk (.mp4, .webm)
+            $detectedVideo = null;
+            foreach (['mp4', 'webm'] as $ext) {
+                if (file_exists(storage_path("app/public/signs/videos/{$letter}.{$ext}"))) {
+                    $detectedVideo = "/storage/signs/videos/{$letter}.{$ext}";
+                    break;
+                }
+            }
+
             Sign::updateOrCreate(
                 [
                     'level_id' => $alphabetLevel->id,
@@ -231,13 +253,13 @@ class SignSeeder extends Seeder
                     'difficulty' => 'easy',
                     'xp_reward' => 10,
                     'sort_order' => $alphabetOrder,
-                    'video_type' => 'local',
-                    'video_start' => null,
-                    'video_end' => null,
+                    'video_type' => $existing?->video_type ?? 'local',
+                    'video_start' => $existing?->video_start ?? null,
+                    'video_end' => $existing?->video_end ?? null,
 
-                    // Alphabet uses image instead of video
-                    'video_url' => null,
-                    'image_url' => "/storage/signs/images/{$letter}.png",
+                    // Preserve existing uploaded media, or use detected disk file
+                    'video_url' => $existing?->video_url ?? $detectedVideo,
+                    'image_url' => $existing?->image_url ?? $detectedImage,
                 ]
             );
 
