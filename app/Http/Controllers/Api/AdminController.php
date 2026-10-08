@@ -7,8 +7,11 @@ use App\Http\Resources\AdminLogResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\AdminService;
+use App\Services\CurriculumEventService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class AdminController extends Controller
 {
@@ -75,6 +78,79 @@ class AdminController extends Controller
         return response()->json([
             'success' => true,
             'data' => AdminLogResource::collection($logs),
+        ], 200);
+    }
+
+    public function getMaintenance(): JsonResponse
+    {
+        $state = Cache::get('platform_maintenance_state', [
+            'enabled'    => false,
+            'message'    => 'Signia is currently undergoing routine curriculum updates. Practice will resume shortly.',
+            'updated_at' => (int) round(microtime(true) * 1000),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $state,
+        ], 200);
+    }
+
+    public function updateMaintenance(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+            'message' => 'nullable|string|max:500',
+        ]);
+
+        $enabled = (bool) $validated['enabled'];
+        $message = trim($validated['message'] ?? '') ?: 'Signia is currently undergoing routine curriculum updates. Practice will resume shortly.';
+        $now = (int) round(microtime(true) * 1000);
+
+        // Fetch previous state to detect real state transitions
+        $previousState = Cache::get('platform_maintenance_state', [
+            'enabled'    => false,
+            'message'    => '',
+            'updated_at' => 0,
+        ]);
+        $wasEnabled = (bool) ($previousState['enabled'] ?? false);
+        $previousMessage = $previousState['message'] ?? '';
+
+        $state = [
+            'enabled'    => $enabled,
+            'message'    => $message,
+            'updated_at' => $now,
+        ];
+
+        Cache::forever('platform_maintenance_state', $state);
+
+        $admin = Auth::user();
+
+        // ONLY record a broadcast event on genuine state transitions
+        if (!$wasEnabled && $enabled) {
+            // State: OFF -> ON (Maintenance activated)
+            CurriculumEventService::record('platform-maintenance', 1, $message, 'active');
+            if ($admin) {
+                $this->adminService->logAction($admin, 'Enabled platform maintenance mode');
+            }
+        } elseif ($wasEnabled && !$enabled) {
+            // State: ON -> OFF (Maintenance deactivated)
+            CurriculumEventService::record('platform-maintenance', 0, 'Platform maintenance has concluded. All learning systems are fully operational!', 'resolved');
+            if ($admin) {
+                $this->adminService->logAction($admin, 'Disabled platform maintenance mode');
+            }
+        } elseif ($wasEnabled && $enabled && $message !== $previousMessage) {
+            // State: ON -> ON with new message
+            CurriculumEventService::record('platform-maintenance', 1, $message, 'active');
+            if ($admin) {
+                $this->adminService->logAction($admin, 'Updated active maintenance message');
+            }
+        }
+        // If !wasEnabled && !enabled: NOTHING is recorded. Zero spam to learners!
+
+        return response()->json([
+            'success' => true,
+            'message' => $enabled ? 'Maintenance mode enabled and broadcasted.' : 'Maintenance settings saved.',
+            'data'    => $state,
         ], 200);
     }
 }

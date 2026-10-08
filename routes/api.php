@@ -47,6 +47,7 @@ Route::get('/stories/{story}', [StoryController::class, 'show']);
 Route::post('/stories/verify-ticket', [StoryController::class, 'verifyTicket']);
 Route::get('/finishers', [FinisherController::class, 'index']);
 Route::get('/curriculum/events', [CurriculumEventController::class, 'index']);
+Route::get('/platform/maintenance', [AdminController::class, 'getMaintenance']);
 
 /*
 |--------------------------------------------------------------------------
@@ -160,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Admin dashboard
         Route::get('/analytics', [AdminController::class, 'analytics']);
         Route::get('/logs', [AdminController::class, 'logs']);
+        Route::post('/platform/maintenance', [AdminController::class, 'updateMaintenance']);
 
         // User management
         Route::get('/users', [AdminController::class, 'users']);
