@@ -6,10 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\VerificationCodeMail;
+use App\Models\EmailVerificationCode;
+use App\Models\User;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -17,9 +23,134 @@ class AuthController extends Controller
         protected AuthService $authService
     ) {}
 
+    public function sendVerificationCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email'           => ['required', 'string', 'email', 'max:255'],
+            'name'            => ['sometimes', 'nullable', 'string', 'max:255'],
+            'turnstile_token' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $name = trim($validated['name'] ?? '') ?: 'there';
+
+        // Check if an account already exists with this email
+        if (User::where('email', $email)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An account with this email already exists. Please log in instead.',
+                'errors'  => [
+                    'email' => ['An account with this email already exists.'],
+                ],
+            ], 422);
+        }
+
+        // Validate that the email host exists and accepts incoming email (prevent bounced emails)
+        if (! $this->isValidEmailHost($email)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enter a valid email address.',
+                'errors'  => [
+                    'email' => ['Enter a valid email address.'],
+                ],
+            ], 422);
+        }
+
+        // Verify Cloudflare Turnstile bot protection token if configured
+        // (Allows resend if the user already initiated a valid verification code within 15 min)
+        $turnstileSecret = config('services.turnstile.secret_key');
+        $hasActiveCode = EmailVerificationCode::where('email', $email)
+            ->where('expires_at', '>', now())
+            ->exists();
+
+        if (!empty($turnstileSecret) && !app()->environment('testing') && !$hasActiveCode) {
+            $turnstileToken = $request->input('turnstile_token');
+            if (empty($turnstileToken)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Security verification required. Please try again.',
+                    'errors'  => [
+                        'turnstile' => ['Security verification required.'],
+                    ],
+                ], 422);
+            }
+
+            if (! $this->verifyTurnstileToken($turnstileToken, $request->ip())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Security check failed. Please refresh the page and try again.',
+                    'errors'  => [
+                        'turnstile' => ['Security check failed. Please refresh and try again.'],
+                    ],
+                ], 422);
+            }
+        }
+
+        // Generate 6-digit code
+        $code = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Remove old codes for this email
+        EmailVerificationCode::where('email', $email)->delete();
+
+        // Save fresh code with 15-minute validity
+        EmailVerificationCode::create([
+            'email'      => $email,
+            'code'       => $code,
+            'expires_at' => now()->addMinutes(15),
+        ]);
+
+        // Send email
+        try {
+            Mail::to($email)->send(new VerificationCodeMail($code, $name));
+        } catch (\Throwable $e) {
+            Log::warning("Could not send verification email to {$email}: " . $e->getMessage());
+        }
+
+        Log::info("Verification code generated for {$email}: {$code}");
+
+        return response()->json([
+            'success' => true,
+            'message' => "Verification code sent to {$email}.",
+        ], 200);
+    }
+
     public function register(RegisterRequest $request): JsonResponse
     {
-        $result = $this->authService->register($request->validated());
+        $validated = $request->validated();
+        $code = $request->input('code');
+
+        // Require code in non-testing environments if code is submitted or in production
+        if (empty($code) && !app()->environment('testing')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A verification code is required to complete registration.',
+                'errors'  => [
+                    'code' => ['A verification code is required to complete registration.'],
+                ],
+            ], 422);
+        }
+
+        if (!empty($code)) {
+            $validCode = EmailVerificationCode::where('email', $validated['email'])
+                ->where('code', trim($code))
+                ->where('expires_at', '>', now())
+                ->first();
+
+            if (!$validCode) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The verification code is invalid or has expired. Please request a new code.',
+                    'errors'  => [
+                        'code' => ['The verification code is invalid or has expired.'],
+                    ],
+                ], 422);
+            }
+
+            // Remove code upon successful verification
+            $validCode->delete();
+        }
+
+        $result = $this->authService->register($validated);
 
         return response()->json([
             'success'    => true,
@@ -43,6 +174,13 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if ($result['status'] === 'google_only') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account was created with Google. Please use "Continue with Google" to log in, or set a password in your account profile.',
+            ], 422);
+        }
+
         if ($result['status'] === 'inactive') {
             return response()->json([
                 'success' => false,
@@ -53,6 +191,89 @@ class AuthController extends Controller
         return response()->json([
             'success'    => true,
             'message'    => 'Login successful.',
+            'data'       => [
+                'user'       => new UserResource($result['user']),
+                'token'      => $result['token'],
+                'token_type' => 'Bearer',
+            ],
+        ], 200);
+    }
+
+    public function google(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'credential'   => ['nullable', 'string'],
+            'id_token'     => ['nullable', 'string'],
+            'access_token' => ['nullable', 'string'],
+        ]);
+
+        $credential = $validated['credential'] ?? $validated['id_token'] ?? null;
+        $accessToken = $validated['access_token'] ?? null;
+
+        if (!$credential && !$accessToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Google credential or access token provided.',
+            ], 422);
+        }
+
+        $googleData = null;
+
+        // 1. Verify via ID Token (Google Identity Services JWT credential)
+        if ($credential) {
+            try {
+                $response = Http::timeout(10)->get('https://oauth2.googleapis.com/tokeninfo', [
+                    'id_token' => $credential,
+                ]);
+
+                if ($response->successful()) {
+                    $json = $response->json();
+                    if (!empty($json['email']) && (!isset($json['email_verified']) || $json['email_verified'] === true || $json['email_verified'] === 'true')) {
+                        $googleData = $json;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Google ID token verification failed: ' . $e->getMessage());
+            }
+        }
+
+        // 2. Direct verification via access_token
+        if (!$googleData && $accessToken) {
+            try {
+                $response = Http::timeout(10)
+                    ->withToken($accessToken)
+                    ->get('https://www.googleapis.com/oauth2/v3/userinfo');
+
+                if ($response->successful()) {
+                    $json = $response->json();
+                    if (!empty($json['email']) && (!isset($json['email_verified']) || $json['email_verified'] === true || $json['email_verified'] === 'true')) {
+                        $googleData = $json;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Google userinfo verification failed: ' . $e->getMessage());
+            }
+        }
+
+        if (!$googleData) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to verify Google account. Please try again.',
+            ], 401);
+        }
+
+        $result = $this->authService->handleGoogleAuth($googleData);
+
+        if ($result['status'] === 'inactive') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account has been deactivated. Please contact support.',
+            ], 403);
+        }
+
+        return response()->json([
+            'success'    => true,
+            'message'    => 'Google authentication successful.',
             'data'       => [
                 'user'       => new UserResource($result['user']),
                 'token'      => $result['token'],
@@ -88,15 +309,23 @@ class AuthController extends Controller
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'avatar' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'current_password' => ['required_with:password', 'nullable', 'string'],
+        $rules = [
+            'name'     => ['sometimes', 'string', 'max:255'],
+            'avatar'   => ['sometimes', 'nullable', 'string', 'max:500'],
             'password' => ['sometimes', 'nullable', 'string', 'min:8'],
-        ]);
+        ];
+
+        // If user already has a password set, require current_password when updating password
+        if (!empty($user->password)) {
+            $rules['current_password'] = ['required_with:password', 'nullable', 'string'];
+        } else {
+            $rules['current_password'] = ['nullable', 'string'];
+        }
+
+        $validated = $request->validate($rules);
 
         if (!empty($validated['password'])) {
-            if (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password)) {
+            if (!empty($user->password) && (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password))) {
                 return response()->json([
                     'success' => false,
                     'message' => 'The provided current password does not match.',
@@ -139,5 +368,71 @@ class AuthController extends Controller
                 'user' => new UserResource($user),
             ],
         ], 200);
+    }
+
+    /**
+     * Verify Cloudflare Turnstile token with Cloudflare API.
+     */
+    protected function verifyTurnstileToken(string $token, ?string $ip = null): bool
+    {
+        $secretKey = config('services.turnstile.secret_key');
+        if (empty($secretKey)) {
+            return true;
+        }
+
+        try {
+            $payload = [
+                'secret'   => $secretKey,
+                'response' => $token,
+            ];
+            if ($ip) {
+                $payload['remoteip'] = $ip;
+            }
+
+            $response = Http::asForm()->timeout(5)->post(
+                'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+                $payload
+            );
+
+            if ($response->successful()) {
+                $result = $response->json();
+                return (bool) ($result['success'] ?? false);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Turnstile verification exception: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if the email domain has valid DNS MX/A records and accepts incoming mail.
+     */
+    protected function isValidEmailHost(string $email): bool
+    {
+        if (app()->environment('testing')) {
+            return true;
+        }
+
+        $domain = substr(strrchr($email, '@'), 1);
+        if (!$domain) {
+            return false;
+        }
+
+        // Check MX records
+        $mxRecords = @dns_get_record($domain, DNS_MX);
+        if (!empty($mxRecords)) {
+            foreach ($mxRecords as $record) {
+                $target = trim($record['target'] ?? '');
+                // '.' is RFC 7505 Null MX (indicates domain explicitly does not accept mail)
+                if ($target !== '' && $target !== '.') {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Fallback: Check if domain has an A record (RFC 5321 fallback)
+        return (bool) @checkdnsrr($domain, 'A');
     }
 }

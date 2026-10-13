@@ -44,4 +44,14 @@ return [
         'payment_method_types' => array_values(array_filter(explode(',', (string) env('PAYMONGO_PAYMENT_METHOD_TYPES', 'card,gcash,paymaya,grab_pay')))),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:3000/login'),
+    ],
+
+    'turnstile' => [
+        'secret_key' => env('CLOUDFLARE_TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA'),
+    ],
+
 ];

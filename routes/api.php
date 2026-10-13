@@ -25,8 +25,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::prefix('auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/send-code', [AuthController::class, 'sendVerificationCode'])->middleware('throttle:5,1');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/google', [AuthController::class, 'google'])->middleware('throttle:10,1');
 });
 Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
 
