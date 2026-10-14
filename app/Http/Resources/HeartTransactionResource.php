@@ -12,6 +12,11 @@ class HeartTransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'user' => $this->whenLoaded('user', fn () => $this->user ? [
+                'id' => $this->user->id,
+                'name' => $this->user->name,
+                'email' => $this->user->email,
+            ] : null),
             'purchase_id' => $this->purchase_id,
             'type' => $this->type,
             'amount' => $this->amount,

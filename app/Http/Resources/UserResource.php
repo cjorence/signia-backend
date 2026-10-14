@@ -15,6 +15,7 @@ class UserResource extends JsonResource
             'email'           => $this->email,
             'role'            => $this->role,
             'is_active'       => $this->is_active,
+            'has_password'    => !empty($this->password),
             'last_active_at'  => $this->last_active_at?->toISOString(),
             'player_profile'  => new PlayerProfileResource($this->whenLoaded('playerProfile')),
             'signs_learned_count' => $this->when(

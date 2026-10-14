@@ -81,3 +81,9 @@ Artisan::command('signs:batch-convert {dir : Directory path containing media fil
     $this->info("Completed! Converted {$convertedVideos} video(s) and {$convertedImages} image(s).");
     return 0;
 })->purpose('Batch convert videos to web-standard H.264 MP4 and images to WebP');
+
+
+// Reconcile asynchronous refunds when no admin or player page is open.
+\Illuminate\Support\Facades\Schedule::call(function () {
+    app(\App\Services\RefundService::class)->syncProcessingRefunds();
+})->name('reconcile-refunds')->everyMinute()->withoutOverlapping();

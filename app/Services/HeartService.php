@@ -12,7 +12,7 @@ use InvalidArgumentException;
 
 class HeartService
 {
-    private const REFRESH_MINUTES = 30;
+    public const REFRESH_MINUTES = 30;
 
     public function status(User $user): PlayerProfile
     {
@@ -74,13 +74,19 @@ class HeartService
             $profile = $this->lockedProfile($user);
 
             $newHearts = min($profile->hearts + $amount, $profile->max_hearts);
+            $usableAdded = $newHearts - $profile->hearts;
+            $inventoryAdded = $type === 'admin_grant' ? max(0, $amount - $usableAdded) : 0;
 
             $profile->update([
                 'hearts' => $newHearts,
+                'heart_inventory' => $profile->heart_inventory + $inventoryAdded,
                 'next_heart_at' => $newHearts >= $profile->max_hearts ? null : $profile->next_heart_at,
             ]);
 
-            $this->log($user->id, $purchase?->id, $type, $amount, $reason, $metadata);
+            $this->log($user->id, $purchase?->id, $type, $amount, $reason, array_merge($metadata, [
+                'usable_hearts_added' => $usableAdded,
+                'inventory_hearts_added' => $inventoryAdded,
+            ]));
 
             return $profile->fresh();
         });

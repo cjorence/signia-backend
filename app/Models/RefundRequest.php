@@ -22,6 +22,9 @@ class RefundRequest extends Model
         'paymongo_refund_id',
         'reviewed_at',
         'reviewed_by',
+        'provider_status',
+        'provider_request_key',
+        'email_delivery_status',
     ];
 
     protected function casts(): array

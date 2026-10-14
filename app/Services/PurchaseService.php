@@ -39,6 +39,8 @@ class PurchaseService
 
     public function getUserPurchases(User $user)
     {
+        app(RefundService::class)->syncProcessingRefunds($user->id);
+
         return Purchase::where('user_id', $user->id)
             ->with(['paymentTransactions', 'latestRefundRequest'])
             ->orderByDesc('created_at')

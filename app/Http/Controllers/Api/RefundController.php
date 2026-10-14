@@ -45,6 +45,7 @@ class RefundController extends Controller
      */
     public function userIndex(): JsonResponse
     {
+        $this->refundService->syncProcessingRefunds(Auth::id());
         $requests = RefundRequest::where('user_id', Auth::id())
             ->with('purchase')
             ->latest()

@@ -21,6 +21,7 @@ class AdminRefundController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->refundService->syncProcessingRefunds();
         $query = RefundRequest::with(['user', 'purchase.paymentTransactions', 'reviewer'])
             ->latest();
 
@@ -60,7 +61,7 @@ class AdminRefundController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Refund approved and processed successfully via PayMongo. Confirmation email sent to customer.',
+            'message' => 'Refund decision saved. Check the processing and email status.',
             'data' => new RefundRequestResource($updated),
         ], 200);
     }
@@ -82,7 +83,7 @@ class AdminRefundController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Refund request rejected. Customer has been notified by email.',
+            'message' => 'Refund request declined.',
             'data' => new RefundRequestResource($updated),
         ], 200);
     }

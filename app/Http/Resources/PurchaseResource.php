@@ -12,6 +12,11 @@ class PurchaseResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'user' => $this->whenLoaded('user', fn () => $this->user ? [
+                'id' => $this->user->id,
+                'name' => $this->user->name,
+                'email' => $this->user->email,
+            ] : null),
             'product_type' => $this->product_type,
             'story_id' => $this->story_id,
             'package_key' => $this->package_key,

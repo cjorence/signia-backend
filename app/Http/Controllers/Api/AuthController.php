@@ -312,7 +312,7 @@ class AuthController extends Controller
         $rules = [
             'name'     => ['sometimes', 'string', 'max:255'],
             'avatar'   => ['sometimes', 'nullable', 'string', 'max:500'],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8'],
+            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
         ];
 
         // If user already has a password set, require current_password when updating password
@@ -322,17 +322,25 @@ class AuthController extends Controller
             $rules['current_password'] = ['nullable', 'string'];
         }
 
-        $validated = $request->validate($rules);
+        $messages = [
+            'password.min'   => 'The new password must be at least 8 characters.',
+            'password.regex' => 'The password must contain at least one uppercase letter, one lowercase letter, and a number.',
+            'current_password.required_with' => 'Please enter your current password.',
+        ];
+
+        $validated = $request->validate($rules, $messages);
 
         if (!empty($validated['password'])) {
-            if (!empty($user->password) && (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password))) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The provided current password does not match.',
-                    'errors' => [
-                        'current_password' => ['The provided current password does not match.'],
-                    ],
-                ], 422);
+            if (!empty($user->password)) {
+                if (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The current password you entered is incorrect.',
+                        'errors' => [
+                            'current_password' => ['The current password you entered is incorrect.'],
+                        ],
+                    ], 422);
+                }
             }
 
             $user->password = $validated['password'];
