@@ -27,6 +27,8 @@ class PurchaseResource extends JsonResource
             'provider' => $this->provider,
             'provider_reference' => $this->provider_reference,
             'checkout_session_id' => $this->checkout_session_id,
+            'paymongo_payment_id' => $this->paymongo_payment_id,
+            'paymongo_refund_id' => $this->paymongo_refund_id,
             'paid_at' => $this->paid_at?->toISOString(),
             'payment_transactions' => PaymentTransactionResource::collection($this->whenLoaded('paymentTransactions')),
             'refund_request' => new RefundRequestResource($this->whenLoaded('latestRefundRequest')),

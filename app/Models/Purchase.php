@@ -64,4 +64,38 @@ class Purchase extends Model
     {
         return $this->hasOne(RefundRequest::class)->latestOfMany();
     }
+
+    public function getPaymongoPaymentIdAttribute(): ?string
+    {
+        $transaction = $this->relationLoaded('paymentTransactions')
+            ? $this->paymentTransactions->last()
+            : $this->paymentTransactions()->latest()->first();
+
+        $payload = $transaction?->raw_payload ?? [];
+        $paymentId = data_get($payload, 'data.attributes.data.attributes.payments.0.id')
+            ?: data_get($payload, 'data.attributes.payments.0.id')
+            ?: data_get($payload, 'data.attributes.data.attributes.payment_intent.attributes.payments.0.id');
+
+        if (! $paymentId) {
+            $directId = data_get($payload, 'data.id');
+            if (is_string($directId) && str_starts_with($directId, 'pay_')) {
+                $paymentId = $directId;
+            }
+        }
+
+        if (! $paymentId && is_string($this->provider_reference) && str_starts_with($this->provider_reference, 'pay_')) {
+            $paymentId = $this->provider_reference;
+        }
+
+        return is_string($paymentId) ? $paymentId : null;
+    }
+
+    public function getPaymongoRefundIdAttribute(): ?string
+    {
+        $refund = $this->relationLoaded('latestRefundRequest')
+            ? $this->latestRefundRequest
+            : $this->latestRefundRequest()->first();
+
+        return $refund?->paymongo_refund_id;
+    }
 }
