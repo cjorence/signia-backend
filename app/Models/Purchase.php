@@ -54,4 +54,14 @@ class Purchase extends Model
     {
         return $this->hasMany(HeartTransaction::class);
     }
+
+    public function refundRequests(): HasMany
+    {
+        return $this->hasMany(RefundRequest::class);
+    }
+
+    public function latestRefundRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(RefundRequest::class)->latestOfMany();
+    }
 }

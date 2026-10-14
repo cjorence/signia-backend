@@ -40,14 +40,14 @@ class PurchaseService
     public function getUserPurchases(User $user)
     {
         return Purchase::where('user_id', $user->id)
-            ->with('paymentTransactions')
+            ->with(['paymentTransactions', 'latestRefundRequest'])
             ->orderByDesc('created_at')
             ->get();
     }
 
     public function getAllPurchases()
     {
-        return Purchase::with(['user', 'paymentTransactions'])
+        return Purchase::with(['user', 'paymentTransactions', 'latestRefundRequest'])
             ->orderByDesc('created_at')
             ->get();
     }

@@ -110,6 +110,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserStoryProgress::class);
     }
+
+    public function refundRequests(): HasMany
+    {
+        return $this->hasMany(RefundRequest::class);
+    }
     
     // ========================
     // HELPERS

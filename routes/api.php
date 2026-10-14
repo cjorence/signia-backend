@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\AdminStoryController;
 use App\Http\Controllers\Api\FinisherController;
 use App\Http\Controllers\Api\UserActivityController;
 use App\Http\Controllers\Api\CurriculumEventController;
+use App\Http\Controllers\Api\RefundController;
+use App\Http\Controllers\Api\AdminRefundController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -106,6 +108,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
         Route::post('/purchases/{purchase}/verify', [PurchaseController::class, 'verify']);
+        Route::post('/purchases/{purchase}/refund-request', [RefundController::class, 'store']);
+        Route::get('/refund-requests', [RefundController::class, 'userIndex']);
 
         Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
         Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
@@ -177,6 +181,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/heart-transactions', [HeartController::class, 'adminTransactions']);
         Route::post('/users/{user}/hearts/grant', [HeartController::class, 'grant']);
+
+        // Refund Requests Management
+        Route::get('/refund-requests', [AdminRefundController::class, 'index']);
+        Route::post('/refund-requests/{refundRequest}/approve', [AdminRefundController::class, 'approve']);
+        Route::post('/refund-requests/{refundRequest}/reject', [AdminRefundController::class, 'reject']);
 
         // Story Chapters (Admin Dynamic Story Management)
         Route::get('/stories', [AdminStoryController::class, 'index']);

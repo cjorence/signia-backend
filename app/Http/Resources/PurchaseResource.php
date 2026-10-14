@@ -24,6 +24,7 @@ class PurchaseResource extends JsonResource
             'checkout_session_id' => $this->checkout_session_id,
             'paid_at' => $this->paid_at?->toISOString(),
             'payment_transactions' => PaymentTransactionResource::collection($this->whenLoaded('paymentTransactions')),
+            'refund_request' => new RefundRequestResource($this->whenLoaded('latestRefundRequest')),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }
