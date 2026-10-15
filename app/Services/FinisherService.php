@@ -38,6 +38,11 @@ class FinisherService
         $totalSigns = $level->signs_count;
 
         $rows = DB::table('progress')
+            ->join('signs', function ($join) {
+                $join->on('signs.id', '=', 'progress.sign_id')
+                    ->on('signs.level_id', '=', 'progress.level_id')
+                    ->whereNull('signs.deleted_at');
+            })
             ->join('users', 'users.id', '=', 'progress.user_id')
             ->leftJoin('player_profiles', 'player_profiles.user_id', '=', 'users.id')
             ->where('progress.level_id', $levelId)
@@ -89,14 +94,19 @@ class FinisherService
 
         // Query completion counts per user per level
         $records = DB::table('progress')
-            ->where('is_completed', true)
-            ->whereIn('level_id', $levels->keys())
-            ->groupBy('user_id', 'level_id')
+            ->join('signs', function ($join) {
+                $join->on('signs.id', '=', 'progress.sign_id')
+                    ->on('signs.level_id', '=', 'progress.level_id')
+                    ->whereNull('signs.deleted_at');
+            })
+            ->where('progress.is_completed', true)
+            ->whereIn('progress.level_id', $levels->keys())
+            ->groupBy('progress.user_id', 'progress.level_id')
             ->select([
-                'user_id',
-                'level_id',
-                DB::raw('COUNT(DISTINCT sign_id) as completed_count'),
-                DB::raw('MAX(updated_at) as finished_at'),
+                'progress.user_id',
+                'progress.level_id',
+                DB::raw('COUNT(DISTINCT progress.sign_id) as completed_count'),
+                DB::raw('MAX(progress.updated_at) as finished_at'),
             ])
             ->get();
 

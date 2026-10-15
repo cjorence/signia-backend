@@ -104,9 +104,13 @@ class AuthController extends Controller
             Mail::to($email)->send(new VerificationCodeMail($code, $name));
         } catch (\Throwable $e) {
             Log::warning("Could not send verification email to {$email}: " . $e->getMessage());
-        }
+            EmailVerificationCode::where('email', $email)->where('code', $code)->delete();
 
-        Log::info("Verification code generated for {$email}: {$code}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to send the verification email. Please try again shortly.',
+            ], 503);
+        }
 
         return response()->json([
             'success' => true,

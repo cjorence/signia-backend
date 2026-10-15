@@ -137,6 +137,10 @@ class AdminStoryManagementTest extends TestCase
         $this->assertStringStartsWith('chapter_8_', $story->file_name);
         $this->assertFileExists(storage_path('app/stories/' . $story->file_name));
 
+        // Clean up both uploaded files so the suite leaves the checkout unchanged.
+        if ($story->cover_url && file_exists(public_path(ltrim($story->cover_url, '/')))) {
+            unlink(public_path(ltrim($story->cover_url, '/')));
+        }
         // Cleanup test file
         if (file_exists(storage_path('app/stories/' . $story->file_name))) {
             unlink(storage_path('app/stories/' . $story->file_name));

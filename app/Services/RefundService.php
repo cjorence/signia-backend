@@ -57,7 +57,7 @@ class RefundService
         }
 
         // Heart inventory validation: check if unused
-        if ($purchase->product_type === 'heart' || $purchase->quantity > 0) {
+        if (in_array($purchase->product_type, ['heart', 'hearts'], true)) {
             $profile = PlayerProfile::where('user_id', $user->id)->first();
             $totalAvailable = ($profile?->heart_inventory ?? 0) + ($profile?->hearts ?? 0);
 
@@ -173,7 +173,7 @@ class RefundService
         }
 
         // Revert Hearts if applicable
-        if ($purchase->product_type === 'heart' || $purchase->quantity > 0) {
+        if (in_array($purchase->product_type, ['heart', 'hearts'], true)) {
             $profile = PlayerProfile::where('user_id', $purchase->user_id)
                 ->lockForUpdate()
                 ->first();
@@ -252,14 +252,23 @@ class RefundService
     }
 
     /** Reconcile only this caller's visible approved requests; never initiate new refunds here. */
-    public function syncProcessingRefunds(?int $userId = null): void
+    public function syncProcessingRefunds(?int $userId = null, int $limit = 20, int $timeoutSeconds = 8): void
     {
         $query = RefundRequest::where('status', 'approved')->whereNotNull('paymongo_refund_id')
             ->whereIn('provider_status', ['pending', 'processing']);
         if ($userId !== null) {
             $query->where('user_id', $userId);
         }
-        foreach ($query->limit(20)->get() as $request) {
+        $limit = max(1, min(20, $limit));
+        $cursorKey = 'refund-sync-cursor-'.($userId ?? 'all');
+        $cursor = (int) Cache::get($cursorKey, 0);
+        $batch = (clone $query)->where('id', '>', $cursor)->orderBy('id')->limit($limit)->get();
+        if ($batch->isEmpty() && $cursor > 0) {
+            $batch = (clone $query)->orderBy('id')->limit($limit)->get();
+        }
+        foreach ($batch as $request) {
+            // Advance even if this request is still pending or throttled, so later refunds get a turn.
+            Cache::put($cursorKey, $request->id, now()->addDay());
             if (! Cache::add('refund-sync-'.$request->id, true, 10)) {
                 continue;
             }
@@ -269,7 +278,7 @@ class RefundService
                     continue;
                 }
                 $url = rtrim((string) config('services.paymongo.api_url', 'https://api.paymongo.com'), '/');
-                $response = Http::acceptJson()->withBasicAuth($key, '')->timeout(8)
+                $response = Http::acceptJson()->withBasicAuth($key, '')->timeout(max(1, $timeoutSeconds))
                     ->get($url.'/v1/refunds/'.$request->paymongo_refund_id);
                 if (! $response->successful() || data_get($response->json(), 'data.id') !== $request->paymongo_refund_id) {
                     continue;

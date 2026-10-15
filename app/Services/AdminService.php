@@ -6,12 +6,10 @@ use App\Models\AdminLog;
 use App\Models\GestureLog;
 use App\Models\Level;
 use App\Models\Progress;
-use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Sign;
 use App\Models\Story;
 use App\Models\User;
-use App\Models\UserStoryProgress;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -61,11 +59,11 @@ class AdminService
             abort(400, 'You cannot deactivate your own account.');
         }
 
-        $user->update([
-            'is_active' => false,
-        ]);
-
-        $this->logAction($admin, "Deactivated user ID {$user->id}");
+        DB::transaction(function () use ($admin, $user) {
+            $user->update(['is_active' => false]);
+            $user->tokens()->delete();
+            $this->logAction($admin, "Deactivated user ID {$user->id}");
+        });
 
         return $user->fresh()->load('playerProfile');
     }
@@ -100,15 +98,19 @@ class AdminService
         // Strategic Weekly Activity (last 7 days)
         $weeklyActivity = [];
         $dayCounts = [];
+        $weekStart = Carbon::now()->subDays(6)->startOfDay();
+        $weekEnd = Carbon::now()->endOfDay();
+        $dailyCounts = [];
+        foreach ([GestureLog::class, QuizAttempt::class, Progress::class] as $model) {
+            $dailyCounts[] = $model::whereBetween('created_at', [$weekStart, $weekEnd])
+                ->selectRaw('DATE(created_at) as activity_day, COUNT(*) as activity_count')
+                ->groupByRaw('DATE(created_at)')
+                ->pluck('activity_count', 'activity_day');
+        }
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i);
-            $startOfDay = $date->copy()->startOfDay();
-            $endOfDay = $date->copy()->endOfDay();
-
-            $gesturesCount = GestureLog::whereBetween('created_at', [$startOfDay, $endOfDay])->count();
-            $quizzesCount = QuizAttempt::whereBetween('created_at', [$startOfDay, $endOfDay])->count();
-            $progressCount = Progress::whereBetween('created_at', [$startOfDay, $endOfDay])->count();
-            $dayCount = $gesturesCount + $quizzesCount + $progressCount;
+            $day = $date->toDateString();
+            $dayCount = array_sum(array_map(fn ($counts) => (int) ($counts[$day] ?? 0), $dailyCounts));
 
             $dayCounts[] = [
                 'day' => strtoupper(substr($date->format('l'), 0, 1)),
@@ -134,21 +136,21 @@ class AdminService
 
         // Most Active Lessons (ranked by practice volume and completions)
         $allLevels = Level::all();
+        $progressByLevel = Progress::select('level_id')
+            ->selectRaw('COUNT(*) as activity_count, COUNT(DISTINCT CASE WHEN is_completed = 1 THEN user_id END) as completed_users')
+            ->groupBy('level_id')->get()->keyBy('level_id');
+        $gesturesByLevel = GestureLog::select('level_id')->selectRaw('COUNT(*) as activity_count')
+            ->groupBy('level_id')->pluck('activity_count', 'level_id');
+        $quizzesByLevel = QuizAttempt::join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
+            ->select('quizzes.level_id')->selectRaw('COUNT(*) as activity_count')
+            ->groupBy('quizzes.level_id')->pluck('activity_count', 'quizzes.level_id');
         $rankedLessons = [];
         foreach ($allLevels as $level) {
-            $quizIds = Quiz::where('level_id', $level->id)->pluck('id');
-            $progressCount = Progress::where('level_id', $level->id)->count();
-            $gesturesCount = GestureLog::where('level_id', $level->id)->count();
-            $quizzesCount = $quizIds->isNotEmpty()
-                ? QuizAttempt::whereIn('quiz_id', $quizIds)->count()
-                : 0;
-
-            $activityCount = $progressCount + $gesturesCount + $quizzesCount;
-
-            $completedUsers = Progress::where('level_id', $level->id)
-                ->where('is_completed', true)
-                ->distinct('user_id')
-                ->count('user_id');
+            $progressStats = $progressByLevel->get($level->id);
+            $activityCount = (int) ($progressStats?->activity_count ?? 0)
+                + (int) ($gesturesByLevel[$level->id] ?? 0)
+                + (int) ($quizzesByLevel[$level->id] ?? 0);
+            $completedUsers = (int) ($progressStats?->completed_users ?? 0);
 
             $completionRate = $totalUsers > 0
                 ? min(100, (int) round(($completedUsers / $totalUsers) * 100))
@@ -179,12 +181,13 @@ class AdminService
 
         // Story Quests Performance (top 3 stories)
         $storyQuests = [];
-        $stories = Story::orderBy('chapter_number')->take(3)->get();
+        $stories = Story::withCount([
+            'progress as plays_count',
+            'progress as completions_count' => fn ($query) => $query->where('status', 'completed'),
+        ])->orderBy('chapter_number')->take(3)->get();
         foreach ($stories as $story) {
-            $plays = UserStoryProgress::where('story_id', $story->id)->count();
-            $completions = UserStoryProgress::where('story_id', $story->id)
-                ->where('status', 'completed')
-                ->count();
+            $plays = (int) $story->plays_count;
+            $completions = (int) $story->completions_count;
             $storyCompletion = $plays > 0
                 ? (int) round(($completions / $plays) * 100)
                 : 0;

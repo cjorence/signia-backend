@@ -58,7 +58,7 @@ Route::get('/platform/maintenance', [AdminController::class, 'getMaintenance']);
 | Protected Routes (Authenticated Users)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Auth
     Route::prefix('auth')->group(function () {

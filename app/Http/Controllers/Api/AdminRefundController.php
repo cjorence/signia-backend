@@ -21,7 +21,7 @@ class AdminRefundController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->refundService->syncProcessingRefunds();
+        $this->refundService->syncProcessingRefunds(null, 1, 2);
         $query = RefundRequest::with(['user', 'purchase.paymentTransactions', 'reviewer'])
             ->latest();
 
