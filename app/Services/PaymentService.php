@@ -215,7 +215,7 @@ class PaymentService
                 return $purchase;
             }
 
-            if ($purchase->status !== 'pending') {
+            if (! in_array($purchase->status, ['pending', 'failed'], true)) {
                 throw ValidationException::withMessages([
                     'payment' => 'This purchase can no longer be paid.',
                 ]);
@@ -269,6 +269,11 @@ class PaymentService
             return $purchase->load(['user', 'paymentTransactions', 'story']);
         }
 
+        if ($purchase->status === 'pending' && $purchase->created_at && $purchase->created_at < now()->subHours(24)) {
+            $purchase->update(['status' => 'failed']);
+            return $purchase->fresh()->load(['user', 'paymentTransactions', 'story']);
+        }
+
         if ($purchase->status !== 'pending' || ! $purchase->checkout_session_id) {
             return $purchase;
         }
@@ -312,6 +317,11 @@ class PaymentService
                     ];
 
                     return $this->fulfillCheckoutPayment($fakeEvent) ?? $purchase->fresh();
+                }
+
+                $sessionStatus = data_get($sessionData, 'status');
+                if (in_array($sessionStatus, ['expired', 'cancelled'], true) || ($purchase->created_at && $purchase->created_at < now()->subHours(24))) {
+                    $purchase->update(['status' => 'failed']);
                 }
             }
         } catch (\Throwable $e) {

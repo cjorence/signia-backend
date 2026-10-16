@@ -104,11 +104,11 @@ class RefundService
         return $refundRequest;
     }
 
-    public function approve(RefundRequest $refundRequest, User $admin, ?string $adminNotes = null): RefundRequest
+    public function approve(RefundRequest $refundRequest, User $admin, ?string $adminNotes = null, ?float $approvedAmount = null): RefundRequest
     {
-        $result = Cache::lock('refund-action-'.$refundRequest->id, 90)->get(function () use ($refundRequest, $admin, $adminNotes) {
+        $result = Cache::lock('refund-action-'.$refundRequest->id, 90)->get(function () use ($refundRequest, $admin, $adminNotes, $approvedAmount) {
             // Persist the attempt key before contacting the provider, so a crash cannot lose it.
-            $prepared = DB::transaction(function () use ($refundRequest, $admin, $adminNotes) {
+            $prepared = DB::transaction(function () use ($refundRequest, $admin, $adminNotes, $approvedAmount) {
                 $request = RefundRequest::whereKey($refundRequest->id)->lockForUpdate()->firstOrFail();
                 $retry = $request->status === 'approved' && in_array($request->provider_status, ['unknown', 'failed'], true);
                 if ($request->status !== 'pending' && ! $retry) {
@@ -118,10 +118,19 @@ class RefundService
                 if ($purchase->status !== 'paid') {
                     throw ValidationException::withMessages(['refund' => 'Only paid purchases can be refunded.']);
                 }
+
+                // If approvedAmount is provided (e.g. 20% cut-off), validate and apply it
+                if ($approvedAmount !== null) {
+                    if ($approvedAmount <= 0 || $approvedAmount > (float) $purchase->amount) {
+                        throw ValidationException::withMessages(['refund' => 'Invalid refund amount specified.']);
+                    }
+                    $request->amount = round($approvedAmount, 2);
+                }
+
                 if ($request->provider_status === 'unknown' && $request->reviewed_at?->lt(now()->subHours(23))) {
                     throw ValidationException::withMessages(['refund' => 'The previous refund could not be confirmed. Check the payment provider before taking further action.']);
                 }
-                $original = $request->only(['status', 'provider_status', 'admin_notes', 'reviewed_at', 'reviewed_by']);
+                $original = $request->only(['status', 'provider_status', 'admin_notes', 'reviewed_at', 'reviewed_by', 'amount']);
                 $reviewedAt = $request->provider_status === 'unknown' ? $request->reviewed_at : now();
                 if (! $request->provider_request_key || $request->provider_status === 'failed') {
                     $request->provider_request_key = (string) Str::uuid();

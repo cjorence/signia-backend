@@ -67,9 +67,13 @@ class PurchaseController extends Controller
     {
         abort_if($purchase->user_id !== Auth::id(), 403);
 
+        if ($purchase->status === 'pending' && $purchase->created_at && $purchase->created_at < now()->subHours(24)) {
+            $purchase->update(['status' => 'failed']);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => new PurchaseResource($purchase->load('paymentTransactions')),
+            'data' => new PurchaseResource($purchase->fresh()->load('paymentTransactions')),
         ], 200);
     }
 

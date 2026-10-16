@@ -96,7 +96,7 @@ class RefundStatusUpdatedMail extends Mailable
                    </table>
                </div>
                <p style="color: #4b5563; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
-                   If you believe this was made in error or have further questions, please contact our support team.
+                   If you believe this was made in error or have further questions, please contact our support team at <a href="mailto:signiafsl@gmail.com" style="color: #059669; font-weight: 600; text-decoration: underline;">signiafsl@gmail.com</a>.
                </p>';
 
         return new Content(

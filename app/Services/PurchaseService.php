@@ -37,8 +37,17 @@ class PurchaseService
         ])->load('user');
     }
 
+    public function expireStalePendingPurchases(): int
+    {
+        return Purchase::where('status', 'pending')
+            ->where('created_at', '<', now()->subHours(24))
+            ->update(['status' => 'failed']);
+    }
+
     public function getUserPurchases(User $user)
     {
+        $this->expireStalePendingPurchases();
+
         app(RefundService::class)->syncProcessingRefunds($user->id, 1, 2);
 
         return Purchase::where('user_id', $user->id)
@@ -49,6 +58,8 @@ class PurchaseService
 
     public function getAllPurchases()
     {
+        $this->expireStalePendingPurchases();
+
         return Purchase::with(['user', 'paymentTransactions', 'latestRefundRequest'])
             ->orderByDesc('created_at')
             ->get();
@@ -60,9 +71,9 @@ class PurchaseService
             return $purchase->load(['user', 'paymentTransactions']);
         }
 
-        if ($purchase->status !== 'pending') {
+        if (! in_array($purchase->status, ['pending', 'failed'], true)) {
             throw ValidationException::withMessages([
-                'purchase' => 'Only pending purchases can be marked as paid.',
+                'purchase' => 'Only pending or failed purchases can be marked as paid.',
             ]);
         }
 
@@ -108,6 +119,8 @@ class PurchaseService
 
     public function revenueSummary(): array
     {
+        $this->expireStalePendingPurchases();
+
         return [
             'total_revenue' => (float) Purchase::where('status', 'paid')->sum('amount'),
             'paid_purchases' => Purchase::where('status', 'paid')->count(),

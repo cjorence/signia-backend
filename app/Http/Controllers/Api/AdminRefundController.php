@@ -51,12 +51,14 @@ class AdminRefundController extends Controller
     {
         $validated = $request->validate([
             'admin_notes' => ['nullable', 'string', 'max:500'],
+            'approved_amount' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         $updated = $this->refundService->approve(
             $refundRequest,
             Auth::user(),
-            $validated['admin_notes'] ?? null
+            $validated['admin_notes'] ?? null,
+            isset($validated['approved_amount']) ? (float) $validated['approved_amount'] : null
         );
 
         return response()->json([

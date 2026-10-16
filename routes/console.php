@@ -87,3 +87,15 @@ Artisan::command('signs:batch-convert {dir : Directory path containing media fil
 \Illuminate\Support\Facades\Schedule::call(function () {
     app(\App\Services\RefundService::class)->syncProcessingRefunds();
 })->name('reconcile-refunds')->everyMinute()->withoutOverlapping();
+
+// Expire abandoned checkouts older than 24 hours
+Artisan::command('purchases:expire-stale', function (\App\Services\PurchaseService $purchaseService) {
+    $count = $purchaseService->expireStalePendingPurchases();
+    $this->info("Expired {$count} stale pending purchase(s).");
+    return 0;
+})->purpose('Auto-expire abandoned checkout sessions older than 24 hours to failed');
+
+\Illuminate\Support\Facades\Schedule::call(function () {
+    app(\App\Services\PurchaseService::class)->expireStalePendingPurchases();
+})->name('expire-stale-purchases')->hourly()->withoutOverlapping();
+
