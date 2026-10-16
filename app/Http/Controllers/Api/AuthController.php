@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\PasswordResetCodeMail;
 use App\Mail\VerificationCodeMail;
 use App\Models\EmailVerificationCode;
 use App\Models\User;
 use App\Services\AuthService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -202,6 +205,235 @@ class AuthController extends Controller
             ],
         ], 200);
     }
+
+    public function sendPasswordResetCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email'           => ['required', 'string', 'email', 'max:255'],
+            'turnstile_token' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+
+        $user = User::where('email', $email)->first();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No account was found with this email address.',
+                'errors'  => [
+                    'email' => ['No account was found with this email address.'],
+                ],
+            ], 404);
+        }
+
+        if (!$this->isValidEmailHost($email)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enter a valid email address.',
+                'errors'  => [
+                    'email' => ['Enter a valid email address.'],
+                ],
+            ], 422);
+        }
+
+        // Verify Turnstile bot protection if configured
+        $turnstileSecret = config('services.turnstile.secret_key');
+        $hasActiveCode = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->where('created_at', '>', Carbon::now()->subMinutes(15))
+            ->exists();
+
+        if (!empty($turnstileSecret) && !app()->environment('testing') && !$hasActiveCode) {
+            $turnstileToken = $request->input('turnstile_token');
+            if (empty($turnstileToken)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Security verification required. Please try again.',
+                    'errors'  => [
+                        'turnstile' => ['Security verification required.'],
+                    ],
+                ], 422);
+            }
+
+            if (!$this->verifyTurnstileToken($turnstileToken, $request->ip())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Security check failed. Please refresh the page and try again.',
+                    'errors'  => [
+                        'turnstile' => ['Security check failed.'],
+                    ],
+                ], 422);
+            }
+        }
+
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        DB::table('password_reset_tokens')->where('email', $email)->delete();
+        DB::table('password_reset_tokens')->insert([
+            'email'      => $email,
+            'token'      => Hash::make($code),
+            'created_at' => Carbon::now(),
+        ]);
+
+        try {
+            Mail::to($email)->send(new PasswordResetCodeMail($code, $user->name));
+        } catch (\Throwable $e) {
+            Log::error("Failed to send password reset email to {$email}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to send password reset code to this email at the moment. Please verify your email or try again later.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'A password reset code has been sent to your email address.',
+        ], 200);
+    }
+
+    public function verifyPasswordResetCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'code'  => ['required', 'string', 'size:6'],
+        ], [
+            'code.size' => 'The verification code must be 6 digits.',
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $code = trim($validated['code']);
+
+        $record = DB::table('password_reset_tokens')->where('email', $email)->first();
+
+        if (!$record) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired verification code. Please request a new code.',
+                'errors'  => [
+                    'code' => ['Invalid or expired verification code.'],
+                ],
+            ], 422);
+        }
+
+        if (Carbon::parse($record->created_at)->addMinutes(15)->isPast()) {
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Your verification code has expired. Please request a new one.',
+                'errors'  => [
+                    'code' => ['Verification code has expired.'],
+                ],
+            ], 422);
+        }
+
+        if (!Hash::check($code, $record->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid verification code. Please check and try again.',
+                'errors'  => [
+                    'code' => ['Invalid verification code.'],
+                ],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification code confirmed.',
+        ], 200);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email'                 => ['required', 'string', 'email', 'max:255'],
+            'code'                  => ['required', 'string', 'size:6'],
+            'password'              => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[a-z]/',
+                'regex:/[A-Z]/',
+                'regex:/[0-9]/',
+            ],
+            'password_confirmation' => ['required', 'string'],
+        ], [
+            'password.min'       => 'Password must be at least 8 characters long.',
+            'password.regex'     => 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.',
+            'password.confirmed' => 'Passwords do not match.',
+            'code.size'          => 'The verification code must be 6 digits.',
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $code = trim($validated['code']);
+
+        $record = DB::table('password_reset_tokens')->where('email', $email)->first();
+
+        if (!$record) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired password reset code. Please request a new code.',
+                'errors'  => [
+                    'code' => ['Invalid or expired verification code.'],
+                ],
+            ], 422);
+        }
+
+        if (Carbon::parse($record->created_at)->addMinutes(15)->isPast()) {
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Your verification code has expired. Please request a new one.',
+                'errors'  => [
+                    'code' => ['Verification code has expired.'],
+                ],
+            ], 422);
+        }
+
+        if (!Hash::check($code, $record->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid verification code. Please check and try again.',
+                'errors'  => [
+                    'code' => ['Invalid verification code.'],
+                ],
+            ], 422);
+        }
+
+        $user = User::where('email', $email)->first();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account not found.',
+            ], 404);
+        }
+
+        $user->password = Hash::make($validated['password']);
+        if (!$user->email_verified_at) {
+            $user->email_verified_at = Carbon::now();
+        }
+        $user->save();
+
+        // Single-use guarantee: remove the token immediately
+        DB::table('password_reset_tokens')->where('email', $email)->delete();
+
+        // Invalidate old active sessions/tokens
+        $user->tokens()->delete();
+
+        // Generate fresh token
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your password has been reset successfully.',
+            'data'    => [
+                'user'       => new UserResource($user),
+                'token'      => $token,
+                'token_type' => 'Bearer',
+            ],
+        ], 200);
+    }
+
 
     public function google(Request $request): JsonResponse
     {

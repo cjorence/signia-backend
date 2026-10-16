@@ -30,6 +30,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/send-code', [AuthController::class, 'sendVerificationCode'])->middleware('throttle:5,1');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/forgot-password', [AuthController::class, 'sendPasswordResetCode'])->middleware('throttle:5,1');
+    Route::post('/verify-reset-code', [AuthController::class, 'verifyPasswordResetCode'])->middleware('throttle:10,1');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
     Route::post('/google', [AuthController::class, 'google'])->middleware('throttle:10,1');
 });
 Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
