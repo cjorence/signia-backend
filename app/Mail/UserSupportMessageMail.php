@@ -34,7 +34,7 @@ class UserSupportMessageMail extends Mailable
         $userName = $this->user->name ?? 'User';
 
         return new Envelope(
-            subject: "[Signia {$catLabel}] {$this->subjectLine} - from {$userName}",
+            subject: "[Signia {$catLabel}] {$this->subjectLine}",
             replyTo: [
                 new Address($this->user->email, $this->user->name ?? 'Signia Player'),
             ]
@@ -56,7 +56,7 @@ class UserSupportMessageMail extends Mailable
         $userId = $this->user->id;
         $subject = htmlspecialchars($this->subjectLine, ENT_QUOTES, 'UTF-8');
         $messageBody = nl2br(htmlspecialchars($this->userMessage, ENT_QUOTES, 'UTF-8'));
-        $sentAt = now()->format('M d, Y h:i A');
+        $sentAt = now()->timezone('Asia/Manila')->format('M d, Y h:i A');
         $year = date('Y');
 
         return new Content(

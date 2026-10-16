@@ -32,6 +32,27 @@ class SupportController extends Controller
                     userMessage: $validated['message']
                 )
             );
+
+            // Send confirmation receipt copy to the user's inbox
+            if ($user->email) {
+                try {
+                    Mail::to($user->email)->send(
+                        new \App\Mail\SupportMessageConfirmationMail(
+                            user: $user,
+                            category: $validated['category'],
+                            subjectLine: $validated['subject'],
+                            userMessage: $validated['message']
+                        )
+                    );
+                } catch (\Throwable $receiptEx) {
+                    // Log receipt error without failing the main submission
+                    Log::warning('Failed to send support confirmation receipt to user', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $receiptEx->getMessage(),
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             Log::error('Failed to send in-app support email', [
                 'user_id' => $user->id,
@@ -46,7 +67,7 @@ class SupportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Your message has been sent directly to the Signia team at ' . $supportEmail . '! We will reply to your account email address.',
+            'message' => 'Your message has been sent directly to the Signia team! A confirmation copy has also been sent to your email (' . $user->email . ').',
         ], 200);
     }
 }

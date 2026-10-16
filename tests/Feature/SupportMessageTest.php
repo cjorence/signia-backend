@@ -42,6 +42,12 @@ class SupportMessageTest extends TestCase
                 && $mail->category === 'suggestion'
                 && str_contains($mail->envelope()->subject, 'healthcare signs');
         });
+
+        Mail::assertSent(\App\Mail\SupportMessageConfirmationMail::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email)
+                && $mail->hasReplyTo('signiafsl@gmail.com')
+                && str_contains($mail->envelope()->subject, 'healthcare signs');
+        });
     }
 
     public function test_unauthenticated_user_cannot_send_support_message(): void
