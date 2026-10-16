@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\UserActivityController;
 use App\Http\Controllers\Api\CurriculumEventController;
 use App\Http\Controllers\Api\RefundController;
 use App\Http\Controllers\Api\AdminRefundController;
+use App\Http\Controllers\Api\SupportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -117,6 +118,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
         Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
         Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
+
+        Route::post('/support/message', [SupportController::class, 'sendMessage'])->middleware('throttle:10,1');
     });
 
     /*
