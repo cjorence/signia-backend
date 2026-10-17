@@ -269,12 +269,8 @@ class PaymentService
             return $purchase->load(['user', 'paymentTransactions', 'story']);
         }
 
-        if ($purchase->status === 'pending' && $purchase->created_at && $purchase->created_at < now()->subHours(24)) {
-            $purchase->update(['status' => 'failed']);
-            return $purchase->fresh()->load(['user', 'paymentTransactions', 'story']);
-        }
-
-        if ($purchase->status !== 'pending' || ! $purchase->checkout_session_id) {
+        // Also reconcile purchases expired locally by older application versions.
+        if (! in_array($purchase->status, ['pending', 'failed'], true) || ! $purchase->checkout_session_id) {
             return $purchase;
         }
 
@@ -286,6 +282,7 @@ class PaymentService
         try {
             $response = Http::acceptJson()
                 ->withBasicAuth($secretKey, '')
+                ->timeout(5)
                 ->get(rtrim((string) config('services.paymongo.api_url'), '/').'/v1/checkout_sessions/'.$purchase->checkout_session_id);
 
             if ($response->successful()) {
@@ -310,6 +307,7 @@ class PaymentService
                                     'id' => $purchase->checkout_session_id,
                                     'attributes' => [
                                         'reference_number' => 'purchase:'.$purchase->id,
+                                        'payments' => $payments,
                                     ],
                                 ],
                             ],
@@ -320,8 +318,9 @@ class PaymentService
                 }
 
                 $sessionStatus = data_get($sessionData, 'status');
-                if (in_array($sessionStatus, ['expired', 'cancelled'], true) || ($purchase->created_at && $purchase->created_at < now()->subHours(24))) {
-                    $purchase->update(['status' => 'failed']);
+                if (in_array($sessionStatus, ['expired', 'cancelled'], true)) {
+                    // Do not overwrite a payment fulfilled by a concurrent webhook.
+                    Purchase::whereKey($purchase->id)->where('status', 'pending')->update(['status' => 'failed']);
                 }
             }
         } catch (\Throwable $e) {

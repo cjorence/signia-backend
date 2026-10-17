@@ -67,8 +67,8 @@ class PurchaseController extends Controller
     {
         abort_if($purchase->user_id !== Auth::id(), 403);
 
-        if ($purchase->status === 'pending' && $purchase->created_at && $purchase->created_at < now()->subHours(24)) {
-            $purchase->update(['status' => 'failed']);
+        if (! $purchase->checkout_session_id && $purchase->created_at && $purchase->created_at < now()->subHours(24)) {
+            Purchase::whereKey($purchase->id)->where('status', 'pending')->whereNull('checkout_session_id')->update(['status' => 'failed']);
         }
 
         return response()->json([

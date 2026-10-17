@@ -119,8 +119,10 @@ class PurchaseExpirationTest extends TestCase
         $this->assertDatabaseHas('purchases', ['status' => 'failed']);
     }
 
-    public function test_verify_endpoint_auto_expires_stale_purchase(): void
+    public function test_verify_endpoint_expires_stale_purchase_only_after_provider_confirms_expiration(): void
     {
+        config(['services.paymongo.secret_key' => 'test', 'services.paymongo.api_url' => 'https://api.paymongo.test']);
+        Http::fake(['https://api.paymongo.test/*' => Http::response(['data' => ['attributes' => ['status' => 'expired', 'payments' => []]]])]);
         $player = User::factory()->create(['role' => 'user']);
         $purchase = Purchase::create([
             'user_id' => $player->id,

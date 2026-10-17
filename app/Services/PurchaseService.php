@@ -6,6 +6,7 @@ use App\Models\PaymentTransaction;
 use App\Models\Purchase;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseService
@@ -37,11 +38,33 @@ class PurchaseService
         ])->load('user');
     }
 
-    public function expireStalePendingPurchases(): int
+    public function expireStalePendingPurchases(bool $verifyProvider = false): int
     {
-        return Purchase::where('status', 'pending')
+        // No hosted session was created, so there is no provider payment to recover.
+        $expired = Purchase::where('status', 'pending')->whereNull('checkout_session_id')
             ->where('created_at', '<', now()->subHours(24))
             ->update(['status' => 'failed']);
+
+        if ($verifyProvider) {
+            // Bounded, rotating reconciliation keeps provider calls off listing endpoints.
+            $query = Purchase::whereIn('status', ['pending', 'failed'])->whereNotNull('checkout_session_id')
+                ->where('created_at', '<', now()->subHours(24));
+            $cursor = (int) Cache::get('purchase-reconciliation-cursor', 0);
+            $batch = (clone $query)->where('id', '>', $cursor)->orderBy('id')->limit(20)->get();
+            if ($batch->isEmpty() && $cursor > 0) {
+                $batch = $query->orderBy('id')->limit(20)->get();
+            }
+            foreach ($batch as $purchase) {
+                Cache::put('purchase-reconciliation-cursor', $purchase->id, now()->addDay());
+                $wasPending = $purchase->status === 'pending';
+                $verified = app(PaymentService::class)->verifyCheckoutSession($purchase);
+                if ($wasPending && $verified->status === 'failed') {
+                    $expired++;
+                }
+            }
+        }
+
+        return $expired;
     }
 
     public function getUserPurchases(User $user)

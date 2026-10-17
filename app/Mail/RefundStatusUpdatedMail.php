@@ -21,6 +21,7 @@ class RefundStatusUpdatedMail extends Mailable
     {
         $orderId = $this->refundRequest->purchase_id;
         $status = $this->refundRequest->status;
+        $needsAttention = $status === 'approved' && in_array($this->refundRequest->provider_status, ['failed', 'unknown'], true);
 
         $subject = match ($status) {
             'refunded' => "Signia: Your Refund for Order #{$orderId} has been Processed",
@@ -29,7 +30,7 @@ class RefundStatusUpdatedMail extends Mailable
             default => "Signia: Refund Status Update for Order #{$orderId}",
         };
 
-        return new Envelope(subject: $subject);
+        return new Envelope(subject: $needsAttention ? "Signia: Your Refund for Order #{$orderId} Needs Attention" : $subject);
     }
 
     public function content(): Content
@@ -40,6 +41,7 @@ class RefundStatusUpdatedMail extends Mailable
         $currency = htmlspecialchars($this->refundRequest->currency, ENT_QUOTES, 'UTF-8');
         $status = $this->refundRequest->status;
         $isApproved = in_array($status, ['approved', 'refunded'], true);
+        $needsAttention = $status === 'approved' && in_array($this->refundRequest->provider_status, ['failed', 'unknown'], true);
         $adminNotes = htmlspecialchars($this->refundRequest->admin_notes ?? '', ENT_QUOTES, 'UTF-8');
         $paymongoRef = htmlspecialchars($this->refundRequest->paymongo_refund_id ?? 'N/A', ENT_QUOTES, 'UTF-8');
         $updatedAt = $this->refundRequest->updated_at?->timezone('Asia/Manila')->format('M d, Y h:i A') ?? now()->timezone('Asia/Manila')->format('M d, Y h:i A');
@@ -53,6 +55,13 @@ class RefundStatusUpdatedMail extends Mailable
             $bannerTextColor = '#065f46';
             $bannerTitle = '✓ Refund Issued & Completed';
             $bannerSub = "Your refund of ₱{$amount} {$currency} has been successfully processed through PayMongo back to your original payment method.";
+        } elseif ($needsAttention) {
+            $bannerBg = '#fffbeb';
+            $bannerBorder = '#fde68a';
+            $bannerTitleColor = '#92400e';
+            $bannerTextColor = '#78350f';
+            $bannerTitle = 'Refund needs attention';
+            $bannerSub = 'Your refund has not been confirmed. Our team needs to check the payment. You do not need to submit another request.';
         } elseif ($status === 'approved') {
             $bannerBg = '#ecfdf5';
             $bannerBorder = '#a7f3d0';
@@ -102,13 +111,13 @@ class RefundStatusUpdatedMail extends Mailable
             ";
         }
 
-        $nextStepsText = $isApproved
+        $nextStepsText = $needsAttention ? '' : ($isApproved
             ? '<p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 16px 0 0 0;">
                    💡 <strong>Processing Timeline:</strong> Depending on whether you paid via GCash, Maya, or Card, PayMongo typically posts the funds back to your account within <strong>5 to 10 banking days</strong>.
                </p>'
             : '<p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 16px 0 0 0;">
                    If you believe this decision was made in error or have additional details or screenshots to share, feel free to reply directly to this email or contact us at <a href="mailto:signiafsl@gmail.com" style="color: #059669; font-weight: 700; text-decoration: underline;">signiafsl@gmail.com</a>.
-               </p>';
+               </p>');
 
         return new Content(
             htmlString: "

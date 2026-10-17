@@ -119,10 +119,15 @@ class RefundService
                     throw ValidationException::withMessages(['refund' => 'Only paid purchases can be refunded.']);
                 }
 
-                // If approvedAmount is provided (e.g. 20% cut-off), validate and apply it
+                $original = $request->only(['status', 'provider_status', 'admin_notes', 'reviewed_at', 'reviewed_by', 'amount', 'provider_request_key']);
+                // An ambiguous attempt must be retried with the identical payment payload.
                 if ($approvedAmount !== null) {
                     if ($approvedAmount <= 0 || $approvedAmount > (float) $purchase->amount) {
                         throw ValidationException::withMessages(['refund' => 'Invalid refund amount specified.']);
+                    }
+                    if ($request->provider_status === 'unknown'
+                        && (int) round($approvedAmount * 100) !== (int) round((float) $request->amount * 100)) {
+                        throw ValidationException::withMessages(['refund' => 'The previous refund is unconfirmed. Retry its original amount or confirm the outcome with the payment provider first.']);
                     }
                     $request->amount = round($approvedAmount, 2);
                 }
@@ -130,7 +135,6 @@ class RefundService
                 if ($request->provider_status === 'unknown' && $request->reviewed_at?->lt(now()->subHours(23))) {
                     throw ValidationException::withMessages(['refund' => 'The previous refund could not be confirmed. Check the payment provider before taking further action.']);
                 }
-                $original = $request->only(['status', 'provider_status', 'admin_notes', 'reviewed_at', 'reviewed_by', 'amount']);
                 $reviewedAt = $request->provider_status === 'unknown' ? $request->reviewed_at : now();
                 if (! $request->provider_request_key || $request->provider_status === 'failed') {
                     $request->provider_request_key = (string) Str::uuid();

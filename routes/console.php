@@ -88,14 +88,14 @@ Artisan::command('signs:batch-convert {dir : Directory path containing media fil
     app(\App\Services\RefundService::class)->syncProcessingRefunds();
 })->name('reconcile-refunds')->everyMinute()->withoutOverlapping();
 
-// Expire abandoned checkouts older than 24 hours
+// Reconcile aged hosted checkouts; expire only confirmed unpaid orders.
 Artisan::command('purchases:expire-stale', function (\App\Services\PurchaseService $purchaseService) {
-    $count = $purchaseService->expireStalePendingPurchases();
+    $count = $purchaseService->expireStalePendingPurchases(true);
     $this->info("Expired {$count} stale pending purchase(s).");
     return 0;
-})->purpose('Auto-expire abandoned checkout sessions older than 24 hours to failed');
+})->purpose('Reconcile aged checkouts and expire confirmed unpaid orders');
 
 \Illuminate\Support\Facades\Schedule::call(function () {
-    app(\App\Services\PurchaseService::class)->expireStalePendingPurchases();
+    app(\App\Services\PurchaseService::class)->expireStalePendingPurchases(true);
 })->name('expire-stale-purchases')->hourly()->withoutOverlapping();
 
