@@ -37,6 +37,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/google', [AuthController::class, 'google'])->middleware('throttle:10,1');
 });
 Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
+Route::post('/contact', [SupportController::class, 'sendPublicContact'])->middleware('throttle:5,1');
 
 // Public game data (read-only)
 Route::get('/levels', [LevelController::class, 'index']);

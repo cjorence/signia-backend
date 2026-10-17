@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\UserSupportMessageMail;
+use App\Mail\PublicContactMessageMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -70,4 +71,47 @@ class SupportController extends Controller
             'message' => 'Your message has been sent directly to the Signia team! A confirmation copy has also been sent to your email (' . $user->email . ').',
         ], 200);
     }
+
+    public function sendPublicContact(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:100'],
+            'email' => ['required', 'string', 'email', 'max:150'],
+            'subject' => ['nullable', 'string', 'max:150'],
+            'message' => ['required', 'string', 'min:10', 'max:5000'],
+        ]);
+
+        $supportEmail = config('mail.support_address', 'signiafsl@gmail.com');
+        $senderName = trim($validated['name'] ?? '') ?: 'Website Visitor';
+        $senderEmail = strtolower(trim($validated['email']));
+        $subjectLine = trim($validated['subject'] ?? '') ?: 'Landing Page Contact Inquiry';
+        $userMessage = trim($validated['message']);
+
+        try {
+            Mail::to($supportEmail)->send(
+                new PublicContactMessageMail(
+                    senderEmail: $senderEmail,
+                    senderName: $senderName,
+                    subjectLine: $subjectLine,
+                    userMessage: $userMessage
+                )
+            );
+        } catch (\Throwable $e) {
+            Log::error('Failed to send public contact inquiry', [
+                'sender_email' => $senderEmail,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to send message right now. You can email us directly at ' . $supportEmail,
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Thank you for reaching out! Your message has been sent to the Signia team (' . $supportEmail . '). We will review it and reply to ' . $senderEmail . ' soon.',
+        ], 200);
+    }
 }
+

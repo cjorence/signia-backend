@@ -75,4 +75,39 @@ class SupportMessageTest extends TestCase
         $response->assertUnprocessable()
             ->assertJsonValidationErrors(['category', 'subject', 'message']);
     }
+
+    public function test_guest_can_send_public_contact_message(): void
+    {
+        Mail::fake();
+
+        $payload = [
+            'name' => 'Juan Dela Cruz',
+            'email' => 'juan@example.com',
+            'subject' => 'Partnership inquiry with SPED school',
+            'message' => 'Good day Signia team! We would love to collaborate and use Signia in our school curriculum.',
+        ];
+
+        $response = $this->postJson('/api/contact', $payload);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        Mail::assertSent(\App\Mail\PublicContactMessageMail::class, function ($mail) {
+            return $mail->hasTo('signiafsl@gmail.com')
+                && $mail->hasReplyTo('juan@example.com', 'Juan Dela Cruz')
+                && str_contains($mail->envelope()->subject, 'Partnership inquiry with SPED school');
+        });
+    }
+
+    public function test_public_contact_validates_required_fields(): void
+    {
+        $response = $this->postJson('/api/contact', [
+            'email' => 'invalid-email',
+            'message' => 'Too short',
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'message']);
+    }
 }
+
