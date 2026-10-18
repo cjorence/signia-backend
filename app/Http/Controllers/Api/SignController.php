@@ -104,6 +104,24 @@ class SignController extends Controller
         ], 200);
     }
 
+    public function bulkArchive(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $archived = $this->signService->bulkArchiveSigns($validated['ids'], $validated['reason'] ?? null);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($archived) . ' lesson(s) archived successfully.',
+            'count' => count($archived),
+            'data' => $archived,
+        ], 200);
+    }
+
     public function restore(int $id): JsonResponse
     {
         $sign = $this->signService->restoreSign($id);
@@ -116,6 +134,23 @@ class SignController extends Controller
         ], 200);
     }
 
+    public function bulkRestore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $restored = $this->signService->bulkRestoreSigns($validated['ids']);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($restored) . ' lesson(s) restored successfully.',
+            'count' => count($restored),
+            'data' => $restored,
+        ], 200);
+    }
+
     public function forceDestroy(int $id): JsonResponse
     {
         $this->signService->forceDeleteSign($id);
@@ -123,6 +158,23 @@ class SignController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Sign permanently deleted.',
+        ], 200);
+    }
+
+    public function bulkForceDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $deletedIds = $this->signService->bulkForceDeleteSigns($validated['ids']);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($deletedIds) . ' lesson(s) permanently deleted.',
+            'count' => count($deletedIds),
+            'deleted_ids' => $deletedIds,
         ], 200);
     }
 

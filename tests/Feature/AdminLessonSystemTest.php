@@ -362,4 +362,49 @@ class AdminLessonSystemTest extends TestCase
         $activeResAgain = $this->getJson('/api/levels');
         $activeResAgain->assertOk()->assertJsonCount(1, 'data');
     }
+
+    public function test_admin_can_bulk_archive_restore_and_force_delete_signs(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $level = Level::create(['name' => 'Alphabet', 'order' => 1, 'required_xp' => 0]);
+        $sign1 = Sign::create(['level_id' => $level->id, 'name' => 'Sign 1', 'difficulty' => 'easy', 'xp_reward' => 10, 'sort_order' => 1]);
+        $sign2 = Sign::create(['level_id' => $level->id, 'name' => 'Sign 2', 'difficulty' => 'easy', 'xp_reward' => 10, 'sort_order' => 2]);
+        $sign3 = Sign::create(['level_id' => $level->id, 'name' => 'Sign 3', 'difficulty' => 'easy', 'xp_reward' => 10, 'sort_order' => 3]);
+
+        // 1. Bulk archive signs 1 and 2
+        $archiveRes = $this->postJson('/api/admin/signs/bulk-archive', [
+            'ids' => [$sign1->id, $sign2->id],
+            'reason' => 'Bulk review',
+        ]);
+        $archiveRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('count', 2);
+
+        $this->assertSoftDeleted('signs', ['id' => $sign1->id]);
+        $this->assertSoftDeleted('signs', ['id' => $sign2->id]);
+        $this->assertNotSoftDeleted('signs', ['id' => $sign3->id]);
+
+        // 2. Bulk restore sign 1
+        $restoreRes = $this->postJson('/api/admin/signs/bulk-restore', [
+            'ids' => [$sign1->id],
+        ]);
+        $restoreRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('count', 1);
+
+        $this->assertNotSoftDeleted('signs', ['id' => $sign1->id]);
+        $this->assertSoftDeleted('signs', ['id' => $sign2->id]);
+
+        // 3. Bulk permanently delete sign 2
+        $deleteRes = $this->postJson('/api/admin/signs/bulk-force-delete', [
+            'ids' => [$sign2->id],
+        ]);
+        $deleteRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('count', 1);
+
+        $this->assertDatabaseMissing('signs', ['id' => $sign2->id]);
+    }
 }

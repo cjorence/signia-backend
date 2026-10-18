@@ -120,6 +120,26 @@ class SignService
     }
 
     /**
+     * Bulk archive multiple signs by IDs.
+     */
+    public function bulkArchiveSigns(array $signIds, ?string $reason = null): array
+    {
+        $signs = Sign::whereIn('id', $signIds)->get();
+        $archived = [];
+
+        foreach ($signs as $sign) {
+            $sign->delete();
+            \App\Services\CurriculumEventService::record('lesson-archived', $sign->id, $sign->name, $reason);
+            $archived[] = [
+                'id' => $sign->id,
+                'name' => $sign->name,
+            ];
+        }
+
+        return $archived;
+    }
+
+    /**
      * Restore an archived sign.
      */
     public function restoreSign(int $signId): Sign
@@ -128,6 +148,26 @@ class SignService
         $sign->restore();
 
         return $sign->fresh()->load('level');
+    }
+
+    /**
+     * Bulk restore multiple signs by IDs.
+     */
+    public function bulkRestoreSigns(array $signIds): array
+    {
+        $signs = Sign::onlyTrashed()->whereIn('id', $signIds)->get();
+        $restored = [];
+
+        foreach ($signs as $sign) {
+            $sign->restore();
+            \App\Services\CurriculumEventService::record('lesson-restored', $sign->id, $sign->name);
+            $restored[] = [
+                'id' => $sign->id,
+                'name' => $sign->name,
+            ];
+        }
+
+        return $restored;
     }
 
     /**
@@ -154,6 +194,47 @@ class SignService
         }
 
         return (bool) $sign->forceDelete();
+    }
+
+    /**
+     * Bulk permanently delete multiple signs by IDs.
+     */
+    public function bulkForceDeleteSigns(array $signIds): array
+    {
+        $signs = Sign::withTrashed()->whereIn('id', $signIds)->get();
+
+        // Safety check: ensure no student progress or logs are tied to any of these signs
+        $blocked = [];
+        foreach ($signs as $sign) {
+            if (\App\Models\Progress::where('sign_id', $sign->id)->exists() ||
+                \App\Models\GestureLog::where('sign_id', $sign->id)->exists()) {
+                $blocked[] = $sign->name;
+            }
+        }
+
+        if (!empty($blocked)) {
+            $names = implode(', ', array_slice($blocked, 0, 5));
+            if (count($blocked) > 5) {
+                $names .= ' and ' . (count($blocked) - 5) . ' more';
+            }
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'signs' => "Cannot permanently delete lesson(s) because student progress or attempt history is attached to: {$names}. Please keep them archived instead.",
+            ]);
+        }
+
+        $deletedIds = [];
+        foreach ($signs as $sign) {
+            if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
+                Storage::disk('public')->delete($sign->image_url);
+            }
+            if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
+                Storage::disk('public')->delete($sign->video_url);
+            }
+            $sign->forceDelete();
+            $deletedIds[] = $sign->id;
+        }
+
+        return $deletedIds;
     }
 
     /**
