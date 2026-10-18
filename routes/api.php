@@ -190,6 +190,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/purchases/{purchase}/mark-paid', [PurchaseController::class, 'markPaid']);
 
         Route::get('/heart-transactions', [HeartController::class, 'adminTransactions']);
+        Route::post('/hearts/grant-bulk', [HeartController::class, 'grantBulk']);
         Route::post('/users/{user}/hearts/grant', [HeartController::class, 'grant']);
 
         // Refund Requests Management
