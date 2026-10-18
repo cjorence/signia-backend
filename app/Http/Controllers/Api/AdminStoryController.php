@@ -44,14 +44,14 @@ class AdminStoryController extends Controller
             'package_file' => ['nullable', 'file', 'max:102400'], // max 100MB
         ]);
 
-        $maxChapter = Story::max('chapter_number') ?? 0;
+        $maxChapter = Story::withTrashed()->max('chapter_number') ?? 0;
         $chapterNumber = ! empty($validated['chapter_number']) ? (int) $validated['chapter_number'] : $maxChapter + 1;
         $order = ! empty($validated['order']) ? (int) $validated['order'] : $chapterNumber;
 
         $slugBase = Str::slug($validated['title']) ?: 'chapter-'.$chapterNumber;
         $slug = $slugBase;
         $counter = 1;
-        while (Story::where('slug', $slug)->exists()) {
+        while (Story::withTrashed()->where('slug', $slug)->exists()) {
             $slug = $slugBase.'-'.$counter++;
         }
 

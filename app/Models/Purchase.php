@@ -42,7 +42,8 @@ class Purchase extends Model
 
     public function story(): BelongsTo
     {
-        return $this->belongsTo(Story::class);
+        // Pending payments must still grant ownership when a chapter is archived.
+        return $this->belongsTo(Story::class)->withTrashed();
     }
 
     public function paymentTransactions(): HasMany
