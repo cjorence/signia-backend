@@ -52,6 +52,7 @@ class SignController extends Controller
     public function store(StoreSignRequest $request): JsonResponse
     {
         $sign = $this->signService->createSign($request->validated());
+        \App\Services\CurriculumEventService::record('lesson-added', $sign->id, $sign->name);
 
         return response()->json([
             'success' => true,

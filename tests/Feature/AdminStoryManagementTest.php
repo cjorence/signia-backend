@@ -83,7 +83,7 @@ class AdminStoryManagementTest extends TestCase
         ]);
     }
 
-    public function test_admin_cannot_delete_chapter_1(): void
+    public function test_admin_cannot_force_delete_chapter_1(): void
     {
         $chapter1 = Story::create([
             'slug' => 'arrival',
@@ -93,10 +93,26 @@ class AdminStoryManagementTest extends TestCase
             'price' => 0,
         ]);
 
-        $response = $this->actingAs($this->admin)->deleteJson('/api/admin/stories/' . $chapter1->id);
+        $response = $this->actingAs($this->admin)->deleteJson('/api/admin/stories/' . $chapter1->id . '/force');
 
         $response->assertStatus(422);
         $this->assertDatabaseHas('stories', ['id' => $chapter1->id]);
+    }
+
+    public function test_admin_can_archive_chapter_1(): void
+    {
+        $chapter1 = Story::create([
+            'slug' => 'arrival',
+            'title' => 'The Arrival',
+            'chapter_number' => 1,
+            'is_free' => true,
+            'price' => 0,
+        ]);
+
+        $response = $this->actingAs($this->admin)->postJson('/api/admin/stories/' . $chapter1->id . '/archive');
+
+        $response->assertStatus(200);
+        $this->assertSoftDeleted('stories', ['id' => $chapter1->id]);
     }
 
     public function test_admin_can_delete_custom_chapter(): void
@@ -162,12 +178,12 @@ class AdminStoryManagementTest extends TestCase
         $this->assertNotSoftDeleted('stories', ['id' => $ch3->id]);
     }
 
-    public function test_admin_cannot_bulk_archive_chapter_1(): void
+    public function test_admin_cannot_bulk_force_delete_chapter_1(): void
     {
         $ch1 = Story::create(['slug' => 'ch1', 'title' => 'Chapter 1', 'chapter_number' => 1]);
         $ch2 = Story::create(['slug' => 'ch2', 'title' => 'Chapter 2', 'chapter_number' => 2]);
 
-        $res = $this->actingAs($this->admin)->postJson('/api/admin/stories/bulk-archive', [
+        $res = $this->actingAs($this->admin)->postJson('/api/admin/stories/bulk-force-delete', [
             'ids' => [$ch1->id, $ch2->id],
         ]);
         $res->assertStatus(422);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Story;
+use App\Services\CurriculumEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -102,6 +103,8 @@ class AdminStoryController extends Controller
             'file_name' => $fileName,
             'required_lesson_ids' => $requiredLessons ?? [],
         ]);
+
+        CurriculumEventService::record('story-added', $story->id, $story->title);
 
         return response()->json([
             'success' => true,
@@ -227,15 +230,11 @@ class AdminStoryController extends Controller
         ], 200);
     }
 
-    public function archive(Story $story): JsonResponse
+    public function archive(Request $request, Story $story): JsonResponse
     {
-        if ($story->chapter_number === 1) {
-            throw ValidationException::withMessages([
-                'story' => 'Chapter 1 (Prologue) is protected and cannot be archived.',
-            ]);
-        }
-
+        $reason = $request->input('reason');
         $story->delete();
+        CurriculumEventService::record('story-archived', $story->id, $story->title, $reason);
 
         return response()->json([
             'success' => true,
@@ -249,21 +248,16 @@ class AdminStoryController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['required', 'integer'],
+            'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
         $stories = Story::whereIn('id', $validated['ids'])->get();
-
-        foreach ($stories as $story) {
-            if ($story->chapter_number === 1) {
-                throw ValidationException::withMessages([
-                    'story' => 'Chapter 1 (Prologue) is protected and cannot be archived.',
-                ]);
-            }
-        }
+        $reason = $validated['reason'] ?? null;
 
         $archived = [];
         foreach ($stories as $story) {
             $story->delete();
+            CurriculumEventService::record('story-archived', $story->id, $story->title, $reason);
             $archived[] = [
                 'id' => $story->id,
                 'title' => $story->title,
@@ -282,6 +276,7 @@ class AdminStoryController extends Controller
     {
         $story = Story::onlyTrashed()->findOrFail($id);
         $story->restore();
+        CurriculumEventService::record('story-restored', $story->id, $story->title);
 
         return response()->json([
             'success' => true,
@@ -302,6 +297,7 @@ class AdminStoryController extends Controller
         $restored = [];
         foreach ($stories as $story) {
             $story->restore();
+            CurriculumEventService::record('story-restored', $story->id, $story->title);
             $restored[] = [
                 'id' => $story->id,
                 'title' => $story->title,
@@ -318,13 +314,8 @@ class AdminStoryController extends Controller
 
     public function destroy(Story $story): JsonResponse
     {
-        if ($story->chapter_number === 1) {
-            throw ValidationException::withMessages([
-                'story' => 'Chapter 1 (Prologue) is protected and cannot be deleted.',
-            ]);
-        }
-
         $story->delete();
+        CurriculumEventService::record('story-archived', $story->id, $story->title);
 
         return response()->json([
             'success' => true,

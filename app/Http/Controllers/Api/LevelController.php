@@ -40,6 +40,7 @@ class LevelController extends Controller
     public function store(StoreLevelRequest $request): JsonResponse
     {
         $level = $this->levelService->createLevel($request->validated());
+        \App\Services\CurriculumEventService::record('category-added', $level->id, $level->name);
 
         return response()->json([
             'success' => true,
