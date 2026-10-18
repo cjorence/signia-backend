@@ -199,6 +199,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/refund-requests/{refundRequest}/reject', [AdminRefundController::class, 'reject']);
 
         // Story Chapters (Admin Dynamic Story Management)
+        Route::get('/stories/archived', [AdminStoryController::class, 'archived']);
+        Route::post('/stories/bulk-archive', [AdminStoryController::class, 'bulkArchive']);
+        Route::post('/stories/bulk-restore', [AdminStoryController::class, 'bulkRestore']);
+        Route::post('/stories/bulk-force-delete', [AdminStoryController::class, 'bulkForceDestroy']);
+        Route::post('/stories/{story}/archive', [AdminStoryController::class, 'archive']);
+        Route::post('/stories/{id}/restore', [AdminStoryController::class, 'restore']);
+        Route::delete('/stories/{id}/force', [AdminStoryController::class, 'forceDestroy']);
         Route::get('/stories', [AdminStoryController::class, 'index']);
         Route::post('/stories', [AdminStoryController::class, 'store']);
         Route::get('/stories/{story}', [AdminStoryController::class, 'show']);

@@ -213,6 +213,109 @@ class AdminStoryController extends Controller
         ], 200);
     }
 
+    public function archived(): JsonResponse
+    {
+        $stories = Story::onlyTrashed()
+            ->withCount(['unlocks', 'progress'])
+            ->orderBy('order')
+            ->orderBy('chapter_number')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $stories,
+        ], 200);
+    }
+
+    public function archive(Story $story): JsonResponse
+    {
+        if ($story->chapter_number === 1) {
+            throw ValidationException::withMessages([
+                'story' => 'Chapter 1 (Prologue) is protected and cannot be archived.',
+            ]);
+        }
+
+        $story->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Story chapter archived successfully.',
+            'data' => $story,
+        ], 200);
+    }
+
+    public function bulkArchive(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $stories = Story::whereIn('id', $validated['ids'])->get();
+
+        foreach ($stories as $story) {
+            if ($story->chapter_number === 1) {
+                throw ValidationException::withMessages([
+                    'story' => 'Chapter 1 (Prologue) is protected and cannot be archived.',
+                ]);
+            }
+        }
+
+        $archived = [];
+        foreach ($stories as $story) {
+            $story->delete();
+            $archived[] = [
+                'id' => $story->id,
+                'title' => $story->title,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($archived) . ' story chapter(s) archived successfully.',
+            'count' => count($archived),
+            'data' => $archived,
+        ], 200);
+    }
+
+    public function restore(int $id): JsonResponse
+    {
+        $story = Story::onlyTrashed()->findOrFail($id);
+        $story->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Story chapter restored successfully.',
+            'data' => $story,
+        ], 200);
+    }
+
+    public function bulkRestore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $stories = Story::onlyTrashed()->whereIn('id', $validated['ids'])->get();
+
+        $restored = [];
+        foreach ($stories as $story) {
+            $story->restore();
+            $restored[] = [
+                'id' => $story->id,
+                'title' => $story->title,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($restored) . ' story chapter(s) restored successfully.',
+            'count' => count($restored),
+            'data' => $restored,
+        ], 200);
+    }
+
     public function destroy(Story $story): JsonResponse
     {
         if ($story->chapter_number === 1) {
@@ -225,7 +328,91 @@ class AdminStoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Story chapter deleted successfully.',
+            'message' => 'Story chapter archived successfully.',
+        ], 200);
+    }
+
+    public function forceDestroy(int $id): JsonResponse
+    {
+        $story = Story::withTrashed()->findOrFail($id);
+
+        if ($story->chapter_number === 1) {
+            throw ValidationException::withMessages([
+                'story' => 'Chapter 1 (Prologue) is protected and cannot be permanently deleted.',
+            ]);
+        }
+
+        // Safety check: ensure no student progress or purchases are tied to this story
+        if ($story->unlocks()->exists() || $story->purchases()->exists() || $story->progress()->exists()) {
+            throw ValidationException::withMessages([
+                'story' => "Cannot permanently delete chapter \"{$story->title}\" because student unlock, purchase, or progress records are attached to it. Please keep it archived instead.",
+            ]);
+        }
+
+        if ($story->cover_url && file_exists(public_path(ltrim($story->cover_url, '/')))) {
+            @unlink(public_path(ltrim($story->cover_url, '/')));
+        }
+
+        if ($story->file_name && file_exists(storage_path('app/stories/' . $story->file_name))) {
+            @unlink(storage_path('app/stories/' . $story->file_name));
+        }
+
+        $story->forceDelete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Story chapter permanently deleted.',
+        ], 200);
+    }
+
+    public function bulkForceDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $stories = Story::withTrashed()->whereIn('id', $validated['ids'])->get();
+
+        $blocked = [];
+        foreach ($stories as $story) {
+            if ($story->chapter_number === 1) {
+                $blocked[] = "Chapter 1 ({$story->title}) is protected";
+            } elseif ($story->unlocks()->exists() || $story->purchases()->exists() || $story->progress()->exists()) {
+                $blocked[] = $story->title;
+            }
+        }
+
+        if (!empty($blocked)) {
+            $names = implode(', ', array_slice($blocked, 0, 5));
+            if (count($blocked) > 5) {
+                $names .= ' and ' . (count($blocked) - 5) . ' more';
+            }
+            throw ValidationException::withMessages([
+                'stories' => "Cannot permanently delete story chapter(s) because records or protection rules apply to: {$names}. Please keep them archived instead.",
+            ]);
+        }
+
+        $deletedIds = [];
+        foreach ($stories as $story) {
+            if ($story->cover_url && file_exists(public_path(ltrim($story->cover_url, '/')))) {
+                @unlink(public_path(ltrim($story->cover_url, '/')));
+            }
+
+            if ($story->file_name && file_exists(storage_path('app/stories/' . $story->file_name))) {
+                @unlink(storage_path('app/stories/' . $story->file_name));
+            }
+
+            $story->forceDelete();
+            $deletedIds[] = $story->id;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($deletedIds) . ' story chapter(s) permanently deleted.',
+            'count' => count($deletedIds),
+            'deleted_ids' => $deletedIds,
         ], 200);
     }
 }
+

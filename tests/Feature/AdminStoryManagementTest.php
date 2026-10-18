@@ -112,7 +112,100 @@ class AdminStoryManagementTest extends TestCase
         $response = $this->actingAs($this->admin)->deleteJson('/api/admin/stories/' . $chapter7->id);
 
         $response->assertStatus(200);
-        $this->assertDatabaseMissing('stories', ['id' => $chapter7->id]);
+        $this->assertSoftDeleted('stories', ['id' => $chapter7->id]);
+    }
+
+    public function test_admin_can_archive_and_restore_story_chapter(): void
+    {
+        $chapter = Story::create([
+            'slug' => 'hidden-valley',
+            'title' => 'The Hidden Valley',
+            'chapter_number' => 3,
+            'is_free' => false,
+            'price' => 59.00,
+        ]);
+
+        // Archive
+        $archiveRes = $this->actingAs($this->admin)->postJson('/api/admin/stories/' . $chapter->id . '/archive');
+        $archiveRes->assertStatus(200);
+        $this->assertSoftDeleted('stories', ['id' => $chapter->id]);
+
+        // List archived
+        $listRes = $this->actingAs($this->admin)->getJson('/api/admin/stories/archived');
+        $listRes->assertStatus(200)->assertJsonFragment(['title' => 'The Hidden Valley']);
+
+        // Restore
+        $restoreRes = $this->actingAs($this->admin)->postJson('/api/admin/stories/' . $chapter->id . '/restore');
+        $restoreRes->assertStatus(200);
+        $this->assertNotSoftDeleted('stories', ['id' => $chapter->id]);
+    }
+
+    public function test_admin_can_bulk_archive_and_bulk_restore_stories(): void
+    {
+        $ch2 = Story::create(['slug' => 'ch2', 'title' => 'Chapter 2', 'chapter_number' => 2]);
+        $ch3 = Story::create(['slug' => 'ch3', 'title' => 'Chapter 3', 'chapter_number' => 3]);
+
+        // Bulk archive
+        $res = $this->actingAs($this->admin)->postJson('/api/admin/stories/bulk-archive', [
+            'ids' => [$ch2->id, $ch3->id],
+        ]);
+        $res->assertStatus(200)->assertJson(['count' => 2]);
+        $this->assertSoftDeleted('stories', ['id' => $ch2->id]);
+        $this->assertSoftDeleted('stories', ['id' => $ch3->id]);
+
+        // Bulk restore
+        $resRestore = $this->actingAs($this->admin)->postJson('/api/admin/stories/bulk-restore', [
+            'ids' => [$ch2->id, $ch3->id],
+        ]);
+        $resRestore->assertStatus(200)->assertJson(['count' => 2]);
+        $this->assertNotSoftDeleted('stories', ['id' => $ch2->id]);
+        $this->assertNotSoftDeleted('stories', ['id' => $ch3->id]);
+    }
+
+    public function test_admin_cannot_bulk_archive_chapter_1(): void
+    {
+        $ch1 = Story::create(['slug' => 'ch1', 'title' => 'Chapter 1', 'chapter_number' => 1]);
+        $ch2 = Story::create(['slug' => 'ch2', 'title' => 'Chapter 2', 'chapter_number' => 2]);
+
+        $res = $this->actingAs($this->admin)->postJson('/api/admin/stories/bulk-archive', [
+            'ids' => [$ch1->id, $ch2->id],
+        ]);
+        $res->assertStatus(422);
+    }
+
+    public function test_admin_can_force_delete_story_without_records(): void
+    {
+        $chapter = Story::create([
+            'slug' => 'temp-chapter',
+            'title' => 'Temp Chapter',
+            'chapter_number' => 99,
+        ]);
+
+        $chapter->delete(); // archive first
+        $this->assertSoftDeleted('stories', ['id' => $chapter->id]);
+
+        $res = $this->actingAs($this->admin)->deleteJson('/api/admin/stories/' . $chapter->id . '/force');
+        $res->assertStatus(200);
+        $this->assertDatabaseMissing('stories', ['id' => $chapter->id]);
+    }
+
+    public function test_admin_cannot_force_delete_story_with_player_unlocks(): void
+    {
+        $chapter = Story::create([
+            'slug' => 'paid-chapter',
+            'title' => 'Paid Chapter',
+            'chapter_number' => 5,
+        ]);
+
+        \App\Models\UserStoryUnlock::create([
+            'user_id' => $this->player->id,
+            'story_id' => $chapter->id,
+            'unlocked_at' => now(),
+        ]);
+
+        $res = $this->actingAs($this->admin)->deleteJson('/api/admin/stories/' . $chapter->id . '/force');
+        $res->assertStatus(422);
+        $this->assertDatabaseHas('stories', ['id' => $chapter->id]);
     }
 
     public function test_admin_can_upload_pck_package_and_cover(): void
