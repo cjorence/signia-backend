@@ -36,6 +36,8 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'preferences' => 'array',
+            'preferences_revision' => 'integer',
             'email_verified_at' => 'datetime',
             'last_active_at' => 'datetime',
             'is_active' => 'boolean',

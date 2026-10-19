@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\LegalAgreement;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthService
 {
@@ -12,29 +15,34 @@ class AuthService
      */
     public function register(array $data): array
     {
-        $user = User::create([
-            'name'              => $data['name'],
-            'email'             => $data['email'],
-            'password'          => $data['password'],
-            'email_verified_at' => now(),
-            'last_active_at'    => now(),
-            'is_active'         => true,
-        ]);
+        Validator::make($data, LegalAgreement::rules())->validate();
 
-        $user->playerProfile()->create([
-            'current_level' => 1,
-            'total_xp'      => 0,
-            'streak'        => 0,
-        ]);
+        return DB::transaction(function () use ($data) {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'email_verified_at' => now(),
+                'last_active_at' => now(),
+                'is_active' => true,
+            ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            $user->playerProfile()->create([
+                'current_level' => 1,
+                'total_xp' => 0,
+                'streak' => 0,
+            ]);
 
-        $user->load('playerProfile');
+            LegalAgreement::record($user, 'email');
+            $token = $user->createToken('auth_token')->plainTextToken;
 
-        return [
-            'user'  => $user,
-            'token' => $token,
-        ];
+            $user->load('playerProfile');
+
+            return [
+                'user' => $user,
+                'token' => $token,
+            ];
+        });
     }
 
     /**
@@ -58,7 +66,7 @@ class AuthService
             return ['status' => 'invalid'];
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return ['status' => 'inactive'];
         }
 
@@ -70,89 +78,105 @@ class AuthService
 
         return [
             'status' => 'success',
-            'user'   => $user,
-            'token'  => $token,
+            'user' => $user,
+            'token' => $token,
         ];
     }
 
     /**
      * Authenticate or register a user via Google OAuth data.
      */
-    public function handleGoogleAuth(array $googleData): array
+    public function handleGoogleAuth(array $googleData, array $agreement = []): array
     {
-        $googleId = $googleData['id'] ?? $googleData['sub'] ?? null;
-        $email = strtolower(trim($googleData['email'] ?? ''));
-        $name = trim($googleData['name'] ?? '') ?: (explode('@', $email)[0] ?: 'User');
-        $avatar = $googleData['avatar'] ?? $googleData['picture'] ?? null;
+        return DB::transaction(function () use ($googleData, $agreement) {
+            $googleId = $googleData['id'] ?? $googleData['sub'] ?? null;
+            $email = strtolower(trim($googleData['email'] ?? ''));
+            $name = trim($googleData['name'] ?? '') ?: (explode('@', $email)[0] ?: 'User');
+            $avatar = $googleData['avatar'] ?? $googleData['picture'] ?? null;
 
-        /** @var User|null $user */
-        $user = User::where('email', $email)
-            ->when($googleId, fn ($q) => $q->orWhere('google_id', $googleId))
-            ->first();
-
-        if ($user) {
-            if (!$user->is_active) {
-                return ['status' => 'inactive'];
+            /** @var User|null $user */
+            $user = $googleId ? User::where('google_id', $googleId)->first() : null;
+            if (!$user) {
+                $user = User::where('email', $email)->first();
+                // An email match must not replace an already-linked Google identity.
+                // Non-Google-hosted addresses need separate account ownership verification.
+                $googleOwnsEmail = str_ends_with($email, '@gmail.com') || !empty($googleData['hd']);
+                if ($user && (!empty($user->google_id) || !$googleOwnsEmail)) {
+                    return ['status' => 'linking_required'];
+                }
             }
 
-            // Link Google ID if not already linked
-            if ($googleId && empty($user->google_id)) {
-                $user->google_id = $googleId;
-            }
+            if ($user) {
+                if (! $user->is_active) {
+                    return ['status' => 'inactive'];
+                }
 
-            // Mark email as verified if not verified yet
-            if (empty($user->email_verified_at)) {
-                $user->email_verified_at = now();
-            }
+                // Link Google ID if not already linked
+                if ($googleId && empty($user->google_id)) {
+                    $user->google_id = $googleId;
+                }
 
-            // Update user name if current name is empty
-            if (empty($user->name) && !empty($name)) {
-                $user->name = $name;
-            }
+                // Mark email as verified if not verified yet
+                if (empty($user->email_verified_at)) {
+                    $user->email_verified_at = now();
+                }
 
-            $user->last_active_at = now();
-            $user->save();
+                // Update user name if current name is empty
+                if (empty($user->name) && ! empty($name)) {
+                    $user->name = $name;
+                }
 
-            // Ensure player profile exists
-            if (!$user->playerProfile) {
+                $user->last_active_at = now();
+                $user->save();
+
+                // Ensure player profile exists
+                if (! $user->playerProfile) {
+                    $user->playerProfile()->create([
+                        'current_level' => 1,
+                        'total_xp' => 0,
+                        'streak' => 0,
+                        'avatar' => $avatar,
+                    ]);
+                } elseif ($avatar && empty($user->playerProfile->avatar)) {
+                    $user->playerProfile->update(['avatar' => $avatar]);
+                }
+            } else {
+                // Google verifies identity; it does not accept Signia's agreement.
+                // Do not create a user, player profile, or session until explicit acceptance.
+                if (Validator::make($agreement, LegalAgreement::rules())->fails()) {
+                    return ['status' => 'agreement_required'];
+                }
+
+                // Create brand new user via Google
+                $user = User::create([
+                    'name' => $name,
+                    'email' => $email,
+                    'google_id' => $googleId,
+                    'email_verified_at' => now(),
+                    'last_active_at' => now(),
+                    'is_active' => true,
+                    'role' => 'user',
+                ]);
+
                 $user->playerProfile()->create([
                     'current_level' => 1,
-                    'total_xp'      => 0,
-                    'streak'        => 0,
-                    'avatar'        => $avatar,
+                    'total_xp' => 0,
+                    'streak' => 0,
+                    'avatar' => $avatar,
                 ]);
-            } elseif ($avatar && empty($user->playerProfile->avatar)) {
-                $user->playerProfile->update(['avatar' => $avatar]);
+                LegalAgreement::record($user, 'google');
             }
-        } else {
-            // Create brand new user via Google
-            $user = User::create([
-                'name'              => $name,
-                'email'             => $email,
-                'google_id'         => $googleId,
-                'email_verified_at' => now(),
-                'last_active_at'    => now(),
-                'is_active'         => true,
-                'role'              => 'user',
-            ]);
 
-            $user->playerProfile()->create([
-                'current_level' => 1,
-                'total_xp'      => 0,
-                'streak'        => 0,
-                'avatar'        => $avatar,
-            ]);
-        }
+            $token = $user->createToken('auth_token')->plainTextToken;
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            $user->load('playerProfile');
 
-        $user->load('playerProfile');
-
-        return [
-            'status' => 'success',
-            'user'   => $user,
-            'token'  => $token,
-        ];
+            return [
+                'status' => 'success',
+                'user' => $user,
+                'token' => $token,
+            ];
+        });
     }
 
     /**

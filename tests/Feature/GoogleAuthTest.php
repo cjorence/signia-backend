@@ -12,11 +12,18 @@ class GoogleAuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['services.google.client_id' => 'signia-test-client']);
+    }
+
     public function test_new_user_can_sign_up_with_google(): void
     {
         Http::fake([
             'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
                 'sub' => 'google-user-12345',
+                'aud' => 'signia-test-client',
                 'email' => 'newuser@gmail.com',
                 'email_verified' => 'true',
                 'name' => 'Real Gmail User',
@@ -26,6 +33,10 @@ class GoogleAuthTest extends TestCase
 
         $response = $this->postJson('/api/auth/google', [
             'credential' => 'valid-mock-jwt-credential',
+            'terms_accepted' => true,
+            'privacy_acknowledged' => true,
+            'terms_version' => \App\Support\LegalAgreement::TERMS_VERSION,
+            'privacy_version' => \App\Support\LegalAgreement::PRIVACY_VERSION,
         ]);
 
         $response->assertStatus(200)
@@ -64,6 +75,7 @@ class GoogleAuthTest extends TestCase
         Http::fake([
             'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
                 'sub' => 'google-user-existing-99',
+                'aud' => 'signia-test-client',
                 'email' => 'existing@gmail.com',
                 'email_verified' => 'true',
                 'name' => 'Existing User',
@@ -162,5 +174,51 @@ class GoogleAuthTest extends TestCase
                 'success' => false,
                 'message' => 'Failed to verify Google account. Please try again.',
             ]);
+    }
+
+    public function test_tokens_for_another_application_and_unverified_emails_are_rejected(): void
+    {
+        foreach ([['aud' => 'another-client'], ['email_verified' => false], ['email_verified' => null], ['sub' => '']] as $invalid) {
+            Http::fake(['https://oauth2.googleapis.com/tokeninfo*' => Http::response(array_replace([
+                'aud' => 'signia-test-client', 'sub' => 'google-subject',
+                'email' => 'learner@gmail.com', 'email_verified' => true,
+            ], $invalid))]);
+            $this->postJson('/api/auth/google', ['credential' => 'mock-credential'])->assertUnauthorized();
+        }
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_access_tokens_must_belong_to_this_application(): void
+    {
+        Http::fake(['https://oauth2.googleapis.com/tokeninfo*' => Http::response(['aud' => 'another-client'])]);
+        $this->postJson('/api/auth/google', ['access_token' => 'mock-access-token'])->assertUnauthorized();
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'userinfo'));
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_google_does_not_silently_link_a_third_party_email_or_replace_an_existing_subject(): void
+    {
+        foreach ([['email' => 'learner@example.com', 'google_id' => null], ['email' => 'learner@gmail.com', 'google_id' => 'original-subject']] as $identity) {
+            $user = User::factory()->create(array_merge($identity, ['is_active' => true]));
+            Http::fake(['https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'aud' => 'signia-test-client', 'sub' => 'different-subject',
+                'email' => $identity['email'], 'email_verified' => true,
+            ])]);
+            $this->postJson('/api/auth/google', ['credential' => 'mock-credential'])->assertStatus(409);
+            $this->assertSame($identity['google_id'], $user->fresh()->google_id);
+        }
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_linked_google_subject_still_finds_account_when_google_email_changes(): void
+    {
+        $user = User::factory()->create(['email' => 'old@example.com', 'google_id' => 'stable-subject', 'is_active' => true]);
+        Http::fake(['https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+            'aud' => 'signia-test-client', 'sub' => 'stable-subject',
+            'email' => 'new@example.com', 'email_verified' => true,
+        ])]);
+        $this->postJson('/api/auth/google', ['credential' => 'mock-credential'])->assertOk()->assertJsonPath('data.user.id', $user->id);
+        $this->assertDatabaseCount('users', 1);
     }
 }

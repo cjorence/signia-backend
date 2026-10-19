@@ -67,6 +67,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Auth
     Route::prefix('auth')->group(function () {
+        Route::get('/preferences', [\App\Http\Controllers\Api\PreferenceController::class, 'show']);
+        Route::patch('/preferences', [\App\Http\Controllers\Api\PreferenceController::class, 'update'])->middleware('throttle:30,1');
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::put('/profile', [AuthController::class, 'updateProfile']);

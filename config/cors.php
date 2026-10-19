@@ -26,11 +26,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // Explicitly listing origins is required when 'supports_credentials' is true
-    'allowed_origins' => [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-    ],
+    // Set the deployed frontend origins explicitly; separate multiple origins with commas.
+    'allowed_origins' => array_values(array_filter(array_map('trim', explode(',',
+        env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+    )))),
 
     'allowed_origins_patterns' => [],
 
@@ -40,7 +39,7 @@ return [
 
     'max_age' => 0,
 
-    // This MUST be true for Laravel Sanctum's cookie-based auth to work
-    'supports_credentials' => true,
+    // This application authenticates with explicit Bearer tokens, not cross-origin cookies.
+    'supports_credentials' => false,
 
 ];

@@ -270,11 +270,66 @@ class AdminService
             'total_stories' => $totalStories,
             'average_accuracy' => $averageAccuracy,
             'most_failed_signs' => $mostFailedSigns,
+            'lesson_difficulty' => $this->getLessonDifficulty(),
             'weekly_activity' => $weeklyActivity,
             'top_lessons' => $topLessons,
             'all_lessons' => $allLessons,
             'story_performance' => $storyQuests,
             'recent_activities' => $recentActivities,
+        ];
+    }
+
+    private function getLessonDifficulty(): array
+    {
+        $end = Carbon::now();
+        $minimumAttempts = 10;
+        $minimumPlayers = 3;
+
+        // Only per-question submissions have a known denominator and a binary score.
+        // Whole-quiz scores do not retain the historical number of questions answered.
+        $lessons = Level::query()
+            ->join('quizzes', 'quizzes.level_id', '=', 'levels.id')
+            ->join('quiz_attempts', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+            ->join('users', 'users.id', '=', 'quiz_attempts.user_id')
+            ->where('users.role', 'user')
+            ->whereNotNull('quiz_attempts.question_id')
+            ->whereIn('quiz_attempts.score', [0, 1])
+            ->whereBetween('quiz_attempts.completed_at', [$end->copy()->subDays(30), $end])
+            ->select('levels.id', 'levels.name', 'levels.order')
+            ->selectRaw('COUNT(*) as attempt_count, COUNT(DISTINCT quiz_attempts.user_id) as player_count')
+            ->selectRaw('SUM(CASE WHEN quiz_attempts.score = 0 THEN 1 ELSE 0 END) as incorrect_count')
+            ->groupBy('levels.id', 'levels.name', 'levels.order')
+            ->get()
+            ->map(function ($level) use ($minimumAttempts, $minimumPlayers) {
+                $attempts = (int) $level->attempt_count;
+                $players = (int) $level->player_count;
+                $sufficient = $attempts >= $minimumAttempts && $players >= $minimumPlayers;
+
+                return [
+                    'id' => $level->id,
+                    'title' => "Level {$level->order} · {$level->name}",
+                    'attempt_count' => $attempts,
+                    'player_count' => $players,
+                    'incorrect_count' => (int) $level->incorrect_count,
+                    'incorrect_rate' => $sufficient ? round($level->incorrect_count / $attempts * 100, 1) : null,
+                    'has_enough_data' => $sufficient,
+                ];
+            })
+            ->sort(function ($a, $b) {
+                return ($b['has_enough_data'] <=> $a['has_enough_data'])
+                    ?: (($b['incorrect_rate'] ?? 0) <=> ($a['incorrect_rate'] ?? 0))
+                    ?: ($b['attempt_count'] <=> $a['attempt_count'])
+                    ?: ($a['id'] <=> $b['id']);
+            })
+            ->take(5)
+            ->values()
+            ->all();
+
+        return [
+            'window_days' => 30,
+            'minimum_attempts' => $minimumAttempts,
+            'minimum_players' => $minimumPlayers,
+            'lessons' => $lessons,
         ];
     }
 

@@ -454,6 +454,10 @@ class AuthController extends Controller
         }
 
         $googleData = null;
+        $clientId = (string) config('services.google.client_id');
+        if ($clientId === '') {
+            return response()->json(['message' => 'Google sign-in is not configured. Please contact support.'], 503);
+        }
 
         // 1. Verify via ID Token (Google Identity Services JWT credential)
         if ($credential) {
@@ -464,30 +468,36 @@ class AuthController extends Controller
 
                 if ($response->successful()) {
                     $json = $response->json();
-                    if (!empty($json['email']) && (!isset($json['email_verified']) || $json['email_verified'] === true || $json['email_verified'] === 'true')) {
+                    if (($json['aud'] ?? null) === $clientId && !empty($json['sub']) && !empty($json['email'])
+                        && in_array($json['email_verified'] ?? null, [true, 'true'], true)) {
                         $googleData = $json;
                     }
                 }
             } catch (\Throwable $e) {
-                Log::warning('Google ID token verification failed: ' . $e->getMessage());
+                Log::warning('Google ID token verification request failed.');
             }
         }
 
         // 2. Direct verification via access_token
         if (!$googleData && $accessToken) {
             try {
+                $tokenInfo = Http::timeout(10)->get('https://oauth2.googleapis.com/tokeninfo', ['access_token' => $accessToken]);
+                if (!$tokenInfo->successful() || ($tokenInfo->json('aud') ?? $tokenInfo->json('issued_to')) !== $clientId) {
+                    return response()->json(['message' => 'Failed to verify Google account. Please try again.'], 401);
+                }
                 $response = Http::timeout(10)
                     ->withToken($accessToken)
                     ->get('https://www.googleapis.com/oauth2/v3/userinfo');
 
                 if ($response->successful()) {
                     $json = $response->json();
-                    if (!empty($json['email']) && (!isset($json['email_verified']) || $json['email_verified'] === true || $json['email_verified'] === 'true')) {
+                    if (!empty($json['sub']) && !empty($json['email'])
+                        && in_array($json['email_verified'] ?? null, [true, 'true'], true)) {
                         $googleData = $json;
                     }
                 }
             } catch (\Throwable $e) {
-                Log::warning('Google userinfo verification failed: ' . $e->getMessage());
+                Log::warning('Google userinfo verification request failed.');
             }
         }
 
@@ -498,7 +508,23 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $result = $this->authService->handleGoogleAuth($googleData);
+        $result = $this->authService->handleGoogleAuth($googleData, $request->only([
+            'terms_accepted', 'privacy_acknowledged', 'terms_version', 'privacy_version',
+        ]));
+
+        if ($result['status'] === 'linking_required') {
+            return response()->json(['message' => 'Sign in using your existing account method. This Google identity cannot be automatically linked to that account.'], 409);
+        }
+
+        if ($result['status'] === 'agreement_required') {
+            return response()->json([
+                'success' => false,
+                'code' => 'agreement_required',
+                'message' => 'Review and accept the Terms of Service and acknowledge the Privacy Notice to create your Signia account.',
+                'terms_version' => \App\Support\LegalAgreement::TERMS_VERSION,
+                'privacy_version' => \App\Support\LegalAgreement::PRIVACY_VERSION,
+            ], 409);
+        }
 
         if ($result['status'] === 'inactive') {
             return response()->json([

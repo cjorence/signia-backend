@@ -64,6 +64,10 @@ class RegistrationVerificationTest extends TestCase
 
         // Wrong code fails
         $failResponse = $this->postJson('/api/auth/register', [
+            'terms_accepted' => true,
+            'privacy_acknowledged' => true,
+            'terms_version' => \App\Support\LegalAgreement::TERMS_VERSION,
+            'privacy_version' => \App\Support\LegalAgreement::PRIVACY_VERSION,
             'name'                  => 'Learner',
             'email'                 => 'learner@gmail.com',
             'password'              => 'Password123!',
@@ -76,6 +80,10 @@ class RegistrationVerificationTest extends TestCase
 
         // Correct code succeeds
         $successResponse = $this->postJson('/api/auth/register', [
+            'terms_accepted' => true,
+            'privacy_acknowledged' => true,
+            'terms_version' => \App\Support\LegalAgreement::TERMS_VERSION,
+            'privacy_version' => \App\Support\LegalAgreement::PRIVACY_VERSION,
             'name'                  => 'Learner',
             'email'                 => 'learner@gmail.com',
             'password'              => 'Password123!',
