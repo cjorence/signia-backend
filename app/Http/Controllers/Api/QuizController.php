@@ -180,6 +180,7 @@ class QuizController extends Controller
                 'score' => $result['score'],
                 'total_questions' => 1,
                 'wrong_answers' => $result['wrong_answers'],
+                'remaining_hearts' => $result['remaining_hearts'] ?? null,
             ],
         ], 200);
     }

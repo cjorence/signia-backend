@@ -289,14 +289,16 @@ class QuizService
         $score = $isCorrect ? 1 : 0;
         $wrongAnswers = $isCorrect ? 0 : 1;
 
-        $attempt = DB::transaction(function () use ($user, $quiz, $question, $score, $wrongAnswers, $answerSignId) {
+        $latestHearts = null;
+        $attempt = DB::transaction(function () use ($user, $quiz, $question, $score, $wrongAnswers, $answerSignId, &$latestHearts) {
             if ($wrongAnswers > 0) {
-                $this->heartService->deduct($user, 1, 'wrong_quiz_answer', [
+                $profile = $this->heartService->deduct($user, 1, 'wrong_quiz_answer', [
                     'quiz_id' => $quiz->id,
                     'question_id' => $question->id,
                     'score' => $score,
                     'total_questions' => 1,
                 ]);
+                $latestHearts = $profile->hearts;
             }
 
             return QuizAttempt::create([
@@ -308,6 +310,11 @@ class QuizService
                 'completed_at' => now(),
             ]);
         });
+
+        if ($latestHearts === null) {
+            $user->loadMissing('playerProfile');
+            $latestHearts = (int) ($user->playerProfile?->hearts ?? 0);
+        }
 
         if ($question->sign_id) {
             $this->progressService->evaluateCompletion($userId, $question->sign_id);
@@ -321,6 +328,7 @@ class QuizService
             'score' => $score,
             'total_questions' => 1,
             'wrong_answers' => $wrongAnswers,
+            'remaining_hearts' => (int) $latestHearts,
         ];
     }
 

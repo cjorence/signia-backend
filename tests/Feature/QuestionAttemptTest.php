@@ -66,7 +66,8 @@ class QuestionAttemptTest extends TestCase
             ->assertJsonPath('data.score', 1)
             ->assertJsonPath('data.total_questions', 1)
             ->assertJsonPath('data.attempt.quiz_id', $quiz->id)
-            ->assertJsonPath('data.attempt.question_id', $question->id);
+            ->assertJsonPath('data.attempt.question_id', $question->id)
+            ->assertJsonPath('data.remaining_hearts', 5);
 
         $this->assertDatabaseHas('quiz_attempts', [
             'user_id' => $player->id,

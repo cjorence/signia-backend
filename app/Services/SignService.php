@@ -82,6 +82,17 @@ class SignService
 
         $sign->update($data);
 
+        if (array_key_exists('level_id', $data) && (int) $data['level_id'] !== (int) $sign->getOriginal('level_id')) {
+            $newLevel = Level::find($data['level_id']);
+            if ($newLevel) {
+                $targetQuiz = $newLevel->quizzes()->where('is_active', true)->first() ?? $newLevel->quizzes()->first();
+                if ($targetQuiz) {
+                    Question::where('sign_id', $sign->id)->update(['quiz_id' => $targetQuiz->id]);
+                }
+                app(QuizService::class)->ensureQuestionsForLevelSigns($newLevel);
+            }
+        }
+
         $letter = $sign->fsl_name ?: $sign->name;
         Question::where('sign_id', $sign->id)->update(['correct_answer' => $letter]);
         $questionIds = Question::where('sign_id', $sign->id)->pluck('id');
