@@ -123,6 +123,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
 
         Route::post('/support/message', [SupportController::class, 'sendMessage'])->middleware('throttle:10,1');
+
+        Route::get('/notifications', [\App\Http\Controllers\Api\PlayerNotificationController::class, 'index']);
+        Route::post('/notifications/read', [\App\Http\Controllers\Api\PlayerNotificationController::class, 'markAsRead']);
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Api\PlayerNotificationController::class, 'markAllAsRead']);
+        Route::delete('/notifications/{id}', [\App\Http\Controllers\Api\PlayerNotificationController::class, 'destroy']);
+        Route::post('/notifications/clear-all', [\App\Http\Controllers\Api\PlayerNotificationController::class, 'clearAll']);
     });
 
     /*
