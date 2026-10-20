@@ -53,10 +53,6 @@ class RefundRequestResource extends JsonResource
                         return null;
                     }
 
-                    $profile = \App\Models\PlayerProfile::where('user_id', $this->user_id)->first();
-                    $totalHearts = ($profile?->hearts ?? 0) + ($profile?->heart_inventory ?? 0);
-                    $heartsPurchased = (int) ($purchase->quantity ?? 0);
-
                     // Check for duplicate orders within 24 hours
                     $duplicateOrder = \App\Models\Purchase::where('user_id', $this->user_id)
                         ->where('id', '!=', $purchase->id)
@@ -71,8 +67,9 @@ class RefundRequestResource extends JsonResource
                         ->first(['id', 'amount', 'created_at']);
 
                     $isHeartPurchase = in_array($purchase->product_type, ['heart', 'hearts'], true);
-                    $heartsIntact = $isHeartPurchase ? ($totalHearts >= $heartsPurchased) : true;
-                    $heartsUsed = $isHeartPurchase ? max(0, $heartsPurchased - $totalHearts) : 0;
+                    $heartUsage = $isHeartPurchase
+                        ? app(\App\Services\HeartService::class)->getPurchaseConsumableUsage($purchase)
+                        : ['hearts_purchased' => 0, 'hearts_remaining' => 0, 'hearts_used' => 0, 'hearts_intact' => true];
 
                     $isStoryPurchase = $purchase->product_type === 'story';
                     $storyUnlocked = $isStoryPurchase && $purchase->story_id
@@ -81,10 +78,10 @@ class RefundRequestResource extends JsonResource
 
                     return [
                         'is_heart_purchase' => $isHeartPurchase,
-                        'hearts_purchased' => $heartsPurchased,
-                        'current_hearts' => $totalHearts,
-                        'hearts_used' => $heartsUsed,
-                        'hearts_intact' => $heartsIntact,
+                        'hearts_purchased' => $heartUsage['hearts_purchased'],
+                        'current_hearts' => $heartUsage['hearts_remaining'],
+                        'hearts_used' => $heartUsage['hearts_used'],
+                        'hearts_intact' => $heartUsage['hearts_intact'],
                         'is_story_purchase' => $isStoryPurchase,
                         'story_id' => $purchase->story_id,
                         'story_unlocked' => $storyUnlocked,

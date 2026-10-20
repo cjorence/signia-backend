@@ -224,6 +224,103 @@ class HeartService
             ->get();
     }
 
+    /**
+     * Calculates consumable heart usage for a specific purchase using
+     * Free-Hearts-First priority and chronological FIFO ledger accounting for paid packs.
+     *
+     * @return array{hearts_purchased: int, hearts_remaining: int, hearts_used: int, hearts_intact: bool}
+     */
+    public function getPurchaseConsumableUsage(Purchase $purchase): array
+    {
+        $heartsPurchased = (int) ($purchase->quantity ?? 0);
+        if (! in_array($purchase->product_type, ['heart', 'hearts'], true) || $heartsPurchased <= 0) {
+            return [
+                'hearts_purchased' => 0,
+                'hearts_remaining' => 0,
+                'hearts_used' => 0,
+                'hearts_intact' => true,
+            ];
+        }
+
+        $transactions = HeartTransaction::where('user_id', $purchase->user_id)
+            ->whereIn('type', ['inventory_credit', 'admin_grant', 'inventory_refill', 'refund'])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        $freeAvailable = 0;
+        $paidPackages = [];
+
+        foreach ($transactions as $tx) {
+            if ($tx->type === 'admin_grant') {
+                $invAdded = (int) (data_get($tx->metadata, 'inventory_hearts_added') ?? 0);
+                $freeAvailable += $invAdded;
+            } elseif ($tx->type === 'inventory_credit' && $tx->purchase_id) {
+                $paidPackages[$tx->purchase_id] = [
+                    'id' => $tx->purchase_id,
+                    'purchased' => (int) $tx->amount,
+                    'remaining' => (int) $tx->amount,
+                ];
+            } elseif ($tx->type === 'refund' && $tx->purchase_id) {
+                $refundAmt = abs((int) $tx->amount);
+                if (isset($paidPackages[$tx->purchase_id])) {
+                    $avail = $paidPackages[$tx->purchase_id]['remaining'];
+                    $fromPkg = min($refundAmt, $avail);
+                    $paidPackages[$tx->purchase_id]['remaining'] -= $fromPkg;
+                    $refundAmt -= $fromPkg;
+                }
+                if ($refundAmt > 0) {
+                    foreach ($paidPackages as &$pkg) {
+                        if ($pkg['remaining'] > 0) {
+                            $take = min($refundAmt, $pkg['remaining']);
+                            $pkg['remaining'] -= $take;
+                            $refundAmt -= $take;
+                            if ($refundAmt <= 0) {
+                                break;
+                            }
+                        }
+                    }
+                    unset($pkg);
+                }
+            } elseif ($tx->type === 'inventory_refill') {
+                $needed = abs((int) $tx->amount);
+                // Free/admin-granted hearts burn first (Option 1)
+                $fromFree = min($needed, $freeAvailable);
+                $freeAvailable -= $fromFree;
+                $needed -= $fromFree;
+
+                if ($needed > 0) {
+                    foreach ($paidPackages as &$pkg) {
+                        if ($pkg['remaining'] > 0) {
+                            $take = min($needed, $pkg['remaining']);
+                            $pkg['remaining'] -= $take;
+                            $needed -= $take;
+                            if ($needed <= 0) {
+                                break;
+                            }
+                        }
+                    }
+                    unset($pkg);
+                }
+            }
+        }
+
+        $packageData = $paidPackages[$purchase->id] ?? [
+            'purchased' => $heartsPurchased,
+            'remaining' => 0,
+        ];
+
+        $remaining = max(0, $packageData['remaining']);
+        $used = max(0, $heartsPurchased - $remaining);
+
+        return [
+            'hearts_purchased' => $heartsPurchased,
+            'hearts_remaining' => $remaining,
+            'hearts_used' => $used,
+            'hearts_intact' => $used === 0 && $remaining >= $heartsPurchased,
+        ];
+    }
+
     private function getProfile(User $user): PlayerProfile
     {
         return PlayerProfile::firstOrCreate(

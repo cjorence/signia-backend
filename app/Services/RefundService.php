@@ -56,17 +56,6 @@ class RefundService
             ]);
         }
 
-        // Heart inventory validation: check if unused
-        if (in_array($purchase->product_type, ['heart', 'hearts'], true)) {
-            $profile = PlayerProfile::where('user_id', $user->id)->first();
-            $totalAvailable = ($profile?->heart_inventory ?? 0) + ($profile?->hearts ?? 0);
-
-            if ($totalAvailable < $purchase->quantity) {
-                throw ValidationException::withMessages([
-                    'purchase' => 'These hearts have already been consumed and cannot be refunded.',
-                ]);
-            }
-        }
 
         $refundRequest = DB::transaction(function () use ($user, $purchase, $data) {
             return RefundRequest::create([
