@@ -188,23 +188,36 @@ class SignService
     {
         $sign = Sign::withTrashed()->findOrFail($signId);
 
-        // Safety check: ensure no student progress or logs are tied to this sign
+        // Safety check 1: ensure no student progress or logs are tied to this sign
         if (\App\Models\Progress::where('sign_id', $signId)->exists() ||
             \App\Models\GestureLog::where('sign_id', $signId)->exists()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'sign' => 'This lesson cannot be permanently deleted because student progress or attempt history is attached to it. Please keep it archived instead.',
+                'sign' => 'This lesson cannot be permanently deleted because student progress or practice history is attached to it. Please keep it archived instead to protect student records.',
             ]);
         }
 
-        if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
-            Storage::disk('public')->delete($sign->image_url);
+        // Safety check 2: ensure no student quiz attempts are attached to questions for this sign
+        $questionIds = \App\Models\Question::where('sign_id', $signId)->pluck('id');
+        if ($questionIds->isNotEmpty() && \App\Models\QuizAttempt::whereIn('question_id', $questionIds)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'sign' => 'This lesson cannot be permanently deleted because student quiz attempts are attached to its questions. Please keep it archived instead.',
+            ]);
         }
 
-        if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
-            Storage::disk('public')->delete($sign->video_url);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($sign, $signId) {
+            // Clean up any remaining questions for this sign (with 0 student attempts)
+            \App\Models\Question::where('sign_id', $signId)->delete();
 
-        return (bool) $sign->forceDelete();
+            if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
+                Storage::disk('public')->delete($sign->image_url);
+            }
+
+            if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
+                Storage::disk('public')->delete($sign->video_url);
+            }
+
+            return (bool) $sign->forceDelete();
+        });
     }
 
     /**
@@ -214,11 +227,15 @@ class SignService
     {
         $signs = Sign::withTrashed()->whereIn('id', $signIds)->get();
 
-        // Safety check: ensure no student progress or logs are tied to any of these signs
+        // Safety check: ensure no student progress, logs, or quiz attempts are tied to any of these signs
         $blocked = [];
         foreach ($signs as $sign) {
-            if (\App\Models\Progress::where('sign_id', $sign->id)->exists() ||
-                \App\Models\GestureLog::where('sign_id', $sign->id)->exists()) {
+            $hasProgress = \App\Models\Progress::where('sign_id', $sign->id)->exists();
+            $hasLogs = \App\Models\GestureLog::where('sign_id', $sign->id)->exists();
+            $questionIds = \App\Models\Question::where('sign_id', $sign->id)->pluck('id');
+            $hasQuizAttempts = $questionIds->isNotEmpty() && \App\Models\QuizAttempt::whereIn('question_id', $questionIds)->exists();
+
+            if ($hasProgress || $hasLogs || $hasQuizAttempts) {
                 $blocked[] = $sign->name;
             }
         }
@@ -229,23 +246,30 @@ class SignService
                 $names .= ' and ' . (count($blocked) - 5) . ' more';
             }
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'signs' => "Cannot permanently delete lesson(s) because student progress or attempt history is attached to: {$names}. Please keep them archived instead.",
+                'signs' => "Cannot permanently delete lesson(s) because student progress or attempt history is attached to: {$names}. Please keep them archived instead to protect student records.",
             ]);
         }
 
-        $deletedIds = [];
-        foreach ($signs as $sign) {
-            if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
-                Storage::disk('public')->delete($sign->image_url);
-            }
-            if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
-                Storage::disk('public')->delete($sign->video_url);
-            }
-            $sign->forceDelete();
-            $deletedIds[] = $sign->id;
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($signs) {
+            $deletedIds = [];
+            foreach ($signs as $sign) {
+                // Clean up questions for this sign (with 0 attempts)
+                \App\Models\Question::where('sign_id', $sign->id)->delete();
 
-        return $deletedIds;
+                if ($sign->image_url && Storage::disk('public')->exists($sign->image_url)) {
+                    Storage::disk('public')->delete($sign->image_url);
+                }
+
+                if ($sign->video_url && Storage::disk('public')->exists($sign->video_url)) {
+                    Storage::disk('public')->delete($sign->video_url);
+                }
+
+                $sign->forceDelete();
+                $deletedIds[] = $sign->id;
+            }
+
+            return $deletedIds;
+        });
     }
 
     /**

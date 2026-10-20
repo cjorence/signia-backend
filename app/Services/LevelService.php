@@ -106,18 +106,55 @@ class LevelService
     {
         $level = Level::withTrashed()->findOrFail($levelId);
 
-        // Safety check: ensure no lessons or player records exist
-        if (\App\Models\Sign::where('level_id', $levelId)->exists() ||
-            \App\Models\Progress::where('level_id', $levelId)->exists() ||
-            \App\Models\GestureLog::where('level_id', $levelId)->exists() ||
-            \App\Models\Quiz::where('level_id', $levelId)->exists() ||
-            \App\Models\Quest::where('level_id', $levelId)->exists()) {
+        // Safety check 1: ensure no lessons (active or archived) exist under this category
+        if (\App\Models\Sign::withTrashed()->where('level_id', $levelId)->exists()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'level' => 'This category cannot be permanently deleted because lessons, quizzes, or student records are attached to it. Please keep it archived instead.',
+                'level' => 'This category cannot be permanently deleted because it still contains lessons (active or archived). Please delete or reassign all lessons before deleting the category.',
             ]);
         }
 
-        return (bool) $level->forceDelete();
+        // Safety check 2: ensure no student learning records exist for this category
+        if (\App\Models\Progress::where('level_id', $levelId)->exists() ||
+            \App\Models\GestureLog::where('level_id', $levelId)->exists() ||
+            \App\Models\Score::where('level_id', $levelId)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'level' => 'This category cannot be permanently deleted because student learning records (progress, camera practice logs, or scores) are attached to it. Please keep it archived instead to protect student history.',
+            ]);
+        }
+
+        // Safety check 3: ensure no active quests belong to this category
+        if (\App\Models\Quest::where('level_id', $levelId)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'level' => 'This category cannot be permanently deleted because quests are attached to it. Please remove or reassign the quests first.',
+            ]);
+        }
+
+        // Safety check 4: quizzes and quiz attempts
+        $quizzes = \App\Models\Quiz::where('level_id', $levelId)->get();
+        if ($quizzes->isNotEmpty()) {
+            $quizIds = $quizzes->pluck('id');
+
+            // Block if students have any quiz attempts or scores
+            if (\App\Models\QuizAttempt::whereIn('quiz_id', $quizIds)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'level' => 'This category cannot be permanently deleted because student quiz attempts and scores are attached to it. Please keep it archived instead.',
+                ]);
+            }
+
+            // Block if quizzes contain custom questions
+            if (\App\Models\Question::whereIn('quiz_id', $quizIds)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'level' => 'This category cannot be permanently deleted because quiz questions are attached to it. Please remove the questions first or keep it archived.',
+                ]);
+            }
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($level, $levelId) {
+            // Clean up any empty/auto-generated quizzes with 0 questions & 0 attempts
+            \App\Models\Quiz::where('level_id', $levelId)->delete();
+
+            return (bool) $level->forceDelete();
+        });
     }
 
     /**
