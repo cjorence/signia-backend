@@ -27,6 +27,7 @@ class SignResource extends JsonResource
             'xp_reward'   => $this->xp_reward,
             'sort_order'  => $this->sort_order,
             'model_label' => $this->model_label,
+            'is_motion'   => (bool) ($this->is_motion ?? false),
             'level'       => new LevelResource($this->whenLoaded('level')),
             'is_archived' => !is_null($this->deleted_at),
             'deleted_at'  => $this->deleted_at?->toISOString(),

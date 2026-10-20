@@ -26,6 +26,7 @@ class Sign extends Model
         'xp_reward',
         'sort_order',
         'model_label',
+        'is_motion',
     ];
 
     protected function casts(): array
@@ -33,6 +34,7 @@ class Sign extends Model
         return [
             'xp_reward' => 'integer',
             'sort_order' => 'integer',
+            'is_motion' => 'boolean',
         ];
     }
 

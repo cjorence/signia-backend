@@ -30,6 +30,7 @@ class StoreSignRequest extends FormRequest
             'difficulty'  => ['required', Rule::in(['easy', 'medium', 'hard'])],
             'xp_reward'   => ['required', 'integer', 'min:0'],
             'sort_order'  => ['nullable', 'integer', 'min:0'],
+            'is_motion'   => ['nullable', 'boolean'],
         ];
     }
 }
