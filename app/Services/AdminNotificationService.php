@@ -3,35 +3,40 @@
 namespace App\Services;
 
 use App\Models\AdminNotification;
+use App\Models\AdminNotificationSetting;
 use App\Models\Purchase;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AdminNotificationService
 {
     public const SETTINGS_KEY = 'admin_notification_settings';
+    private const DEFAULT_SETTINGS = [
+        'newUserAlerts' => true,
+        'purchaseAlerts' => true,
+        'trainingAlerts' => true,
+    ];
 
     public function getSettings(): array
     {
-        return Cache::get(self::SETTINGS_KEY, [
-            'newUserAlerts' => true,
-            'purchaseAlerts' => true,
-            'trainingAlerts' => true,
-        ]);
+        return array_replace(self::DEFAULT_SETTINGS, AdminNotificationSetting::find(1)?->preferences ?? []);
     }
 
     public function updateSettings(array $settings): array
     {
-        $current = $this->getSettings();
-        $updated = [
-            'newUserAlerts' => array_key_exists('newUserAlerts', $settings) ? (bool) $settings['newUserAlerts'] : $current['newUserAlerts'],
-            'purchaseAlerts' => array_key_exists('purchaseAlerts', $settings) ? (bool) $settings['purchaseAlerts'] : $current['purchaseAlerts'],
-            'trainingAlerts' => array_key_exists('trainingAlerts', $settings) ? (bool) $settings['trainingAlerts'] : $current['trainingAlerts'],
-        ];
+        return DB::transaction(function () use ($settings) {
+            AdminNotificationSetting::firstOrCreate(['id' => 1], ['preferences' => self::DEFAULT_SETTINGS]);
+            $record = AdminNotificationSetting::whereKey(1)->lockForUpdate()->firstOrFail();
+            $updated = array_replace(self::DEFAULT_SETTINGS, $record->preferences);
+            foreach (self::DEFAULT_SETTINGS as $key => $default) {
+                if (array_key_exists($key, $settings)) {
+                    $updated[$key] = (bool) $settings[$key];
+                }
+            }
+            $record->update(['preferences' => $updated]);
 
-        Cache::forever(self::SETTINGS_KEY, $updated);
-
-        return $updated;
+            return $updated;
+        });
     }
 
     public function notifyNewUser(User $user): ?AdminNotification
@@ -64,24 +69,26 @@ class AdminNotificationService
         $user = $user ?? $purchase->user;
         $userName = $user ? $user->name : 'A learner';
         $amount = number_format((float) ($purchase->amount ?? 0), 2);
+        $currency = strtoupper((string) ($purchase->currency ?: 'PHP'));
         $packageKey = $purchase->package_key ?? $purchase->product_name ?? 'Heart Refill Package';
 
         return AdminNotification::create([
             'type' => 'heart_purchase',
             'title' => 'Hearts Store Purchase',
-            'message' => "{$userName} purchased {$packageKey} for \${$amount}.",
+            'message' => "{$userName} purchased {$packageKey} for {$currency} {$amount}.",
             'data' => [
                 'purchase_id' => $purchase->id,
                 'user_id' => $user?->id,
                 'user_name' => $userName,
                 'amount' => $purchase->amount,
+                'currency' => $currency,
                 'package_key' => $packageKey,
             ],
             'severity' => 'success',
         ]);
     }
 
-    public function notifyTrainingComplete(string $category, float $accuracy, ?string $modelPath = null): ?AdminNotification
+    public function notifyTrainingComplete(string $jobId, string $category, float $accuracy, ?string $modelPath = null): ?AdminNotification
     {
         $settings = $this->getSettings();
         if (!($settings['trainingAlerts'] ?? true)) {
@@ -90,17 +97,28 @@ class AdminNotificationService
 
         $accuracyPercent = round($accuracy * 100, 1);
 
-        return AdminNotification::create([
-            'type' => 'model_training',
-            'title' => 'AI Model Training Completed',
-            'message' => "Model checkpoint for category '{$category}' finished training with {$accuracyPercent}% accuracy.",
-            'data' => [
-                'category' => $category,
-                'accuracy' => $accuracy,
-                'model_path' => $modelPath,
-            ],
-            'severity' => 'success',
-        ]);
+        return DB::transaction(function () use ($jobId, $category, $accuracy, $accuracyPercent, $modelPath) {
+            $claimed = DB::table('admin_notification_events')->insertOrIgnore([
+                'event_key' => 'training:'.strtolower($jobId),
+                'created_at' => now(),
+            ]);
+            if (! $claimed) {
+                return null;
+            }
+
+            return AdminNotification::create([
+                'type' => 'model_training',
+                'title' => 'AI Model Training Completed',
+                'message' => "Model checkpoint for category '{$category}' finished training with {$accuracyPercent}% accuracy.",
+                'data' => [
+                    'job_id' => $jobId,
+                    'category' => $category,
+                    'accuracy' => $accuracy,
+                    'model_path' => $modelPath,
+                ],
+                'severity' => 'success',
+            ]);
+        });
     }
 
     public function getNotifications(int $limit = 50): array

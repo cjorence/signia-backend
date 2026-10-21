@@ -99,21 +99,17 @@ class AdminNotificationController extends Controller
 
     public function reportTrainingComplete(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'category' => 'required|string|max:100',
             'accuracy' => 'required|numeric|min:0|max:1',
             'model_path' => 'nullable|string|max:255',
         ]);
 
-        $notification = $this->notificationService->notifyTrainingComplete(
-            $validated['category'],
-            (float) $validated['accuracy'],
-            $validated['model_path'] ?? null
-        );
-
+        // Older open browser tabs still send this callback. Acknowledge it without
+        // creating an alert: the verified Python status response is authoritative.
         return response()->json([
             'success' => true,
-            'data' => $notification,
-        ], 201);
+            'data' => null,
+        ], 200);
     }
 }

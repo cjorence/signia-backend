@@ -152,7 +152,7 @@ class AdminNotificationSystemTest extends TestCase
         $this->assertStringContainsString($this->player->name, $notif->message);
     }
 
-    public function test_admin_can_report_and_receive_model_training_notification(): void
+    public function test_legacy_training_callback_is_acknowledged_without_creating_unverified_alert(): void
     {
         $response = $this->actingAs($this->admin)->postJson('/api/admin/notifications/training-completed', [
             'category' => 'Greetings',
@@ -160,15 +160,8 @@ class AdminNotificationSystemTest extends TestCase
             'model_path' => 'models/greetings_lstm.pt',
         ]);
 
-        $response->assertStatus(201);
-
-        $this->assertDatabaseHas('admin_notifications', [
-            'type' => 'model_training',
-            'title' => 'AI Model Training Completed',
-        ]);
-
-        $notification = AdminNotification::where('type', 'model_training')->first();
-        $this->assertStringContainsString('96.5%', $notification->message);
+        $response->assertOk()->assertJsonPath('data', null);
+        $this->assertDatabaseCount('admin_notifications', 0);
     }
 
     public function test_admin_can_manage_notifications_read_and_delete(): void
