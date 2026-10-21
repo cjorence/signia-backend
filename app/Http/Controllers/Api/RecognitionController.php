@@ -30,9 +30,9 @@ class RecognitionController extends Controller
 
     public function admin(Request $request, string $path)
     {
-        $get = in_array($path, ['api/train/labels', 'api/train/stats', 'models'], true)
+        $get = in_array($path, ['api/train/labels', 'api/train/stats', 'models', 'modes'], true)
             || preg_match('#^api/train/status/[a-f0-9-]{36}$#D', $path);
-        $download = preg_match('#^model_file/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+\.(pt|pth|keras|pkl|json|npy)$#D', $path);
+        $download = preg_match('#^model_file/([A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.(pt|pth|keras|pkl|json|npy)$#D', $path);
         if ($request->isMethod('get') && ($get || $download)) {
             return $this->forward($path, 'GET', [], null, (bool) $download);
         }
