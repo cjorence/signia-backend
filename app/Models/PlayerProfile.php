@@ -45,4 +45,26 @@ class PlayerProfile extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    // ========================
+    // ACCESSORS
+    // ========================
+
+    /**
+     * Compute active streak. If practice has not occurred today or yesterday, streak is 0.
+     */
+    public function getActiveStreakAttribute(): int
+    {
+        $streak = (int) ($this->streak ?? 0);
+        if (! $this->last_played_date) {
+            return 0;
+        }
+
+        $lastPlayed = $this->last_played_date->copy()->startOfDay();
+        if (! $lastPlayed->isToday() && ! $lastPlayed->isYesterday()) {
+            return 0;
+        }
+
+        return $streak;
+    }
 }

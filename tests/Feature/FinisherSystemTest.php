@@ -161,4 +161,45 @@ class FinisherSystemTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data', []);
     }
+
+    public function test_finishers_streak_expires_when_last_played_is_old(): void
+    {
+        $level = Level::create(['name' => 'Colors', 'difficulty' => 'easy', 'order' => 1]);
+        $sign = Sign::create(['level_id' => $level->id, 'name' => 'Red', 'fsl_name' => 'Red', 'model_label' => 'Red', 'order' => 1]);
+
+        $activeUser = User::factory()->create(['name' => 'Active Streak User']);
+        PlayerProfile::create([
+            'user_id' => $activeUser->id,
+            'total_xp' => 500,
+            'streak' => 7,
+            'last_played_date' => now()->toDateString(),
+        ]);
+
+        $staleUser = User::factory()->create(['name' => 'Stale Streak User']);
+        PlayerProfile::create([
+            'user_id' => $staleUser->id,
+            'total_xp' => 400,
+            'streak' => 10,
+            'last_played_date' => now()->subDays(5)->toDateString(),
+        ]);
+
+        Progress::create(['user_id' => $activeUser->id, 'sign_id' => $sign->id, 'level_id' => $level->id, 'is_completed' => true]);
+        Progress::create(['user_id' => $staleUser->id, 'sign_id' => $sign->id, 'level_id' => $level->id, 'is_completed' => true]);
+
+        // Global category finishers
+        $response = $this->getJson('/api/finishers');
+        $response->assertOk()
+            ->assertJsonPath('data.0.user_id', $activeUser->id)
+            ->assertJsonPath('data.0.streak', 7)
+            ->assertJsonPath('data.1.user_id', $staleUser->id)
+            ->assertJsonPath('data.1.streak', 0);
+
+        // Level-specific finishers
+        $levelResponse = $this->getJson("/api/finishers?level_id={$level->id}");
+        $levelResponse->assertOk()
+            ->assertJsonPath('data.0.user_id', $activeUser->id)
+            ->assertJsonPath('data.0.streak', 7)
+            ->assertJsonPath('data.1.user_id', $staleUser->id)
+            ->assertJsonPath('data.1.streak', 0);
+    }
 }

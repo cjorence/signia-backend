@@ -47,12 +47,13 @@ class FinisherService
             ->leftJoin('player_profiles', 'player_profiles.user_id', '=', 'users.id')
             ->where('progress.level_id', $levelId)
             ->where('progress.is_completed', true)
-            ->groupBy('users.id', 'users.name', 'player_profiles.avatar', 'player_profiles.total_xp', 'player_profiles.streak')
+            ->groupBy('users.id', 'users.name', 'player_profiles.avatar', 'player_profiles.total_xp', 'player_profiles.streak', 'player_profiles.last_played_date')
             ->havingRaw('COUNT(DISTINCT progress.sign_id) >= ?', [$totalSigns])
             ->select([
                 'users.id as user_id',
                 'users.name',
                 'player_profiles.avatar',
+                'player_profiles.last_played_date',
                 DB::raw('COALESCE(player_profiles.total_xp, 0) as total_xp'),
                 DB::raw('COALESCE(player_profiles.streak, 0) as streak'),
                 DB::raw('MAX(progress.updated_at) as finished_at'),
@@ -63,12 +64,22 @@ class FinisherService
             ->get();
 
         return $rows->map(function ($row) use ($level) {
+            $streak = (int) $row->streak;
+            if ($row->last_played_date) {
+                $lastPlayed = \Carbon\Carbon::parse($row->last_played_date)->startOfDay();
+                if (! $lastPlayed->isToday() && ! $lastPlayed->isYesterday()) {
+                    $streak = 0;
+                }
+            } else {
+                $streak = 0;
+            }
+
             return [
                 'user_id' => (int) $row->user_id,
                 'name' => $row->name,
                 'avatar' => $row->avatar ?: '👤',
                 'xp' => (int) $row->total_xp,
-                'streak' => (int) $row->streak,
+                'streak' => $streak,
                 'info' => 'Sign Finisher',
                 'finished_at' => $row->finished_at,
                 'level_id' => $level->id,
@@ -148,6 +159,7 @@ class FinisherService
 
             $count = count($completionData['completed_level_ids']);
             $xp = (int) ($user->playerProfile?->total_xp ?? 0);
+            $streak = (int) ($user->playerProfile?->active_streak ?? 0);
             $catText = $count === 1 ? '1 category' : "{$count} categories";
 
             $finishers[] = [
@@ -155,7 +167,7 @@ class FinisherService
                 'name' => $user->name,
                 'avatar' => $user->playerProfile?->avatar ?: '👤',
                 'xp' => $xp,
-                'streak' => (int) ($user->playerProfile?->streak ?? 0),
+                'streak' => $streak,
                 'info' => "Completed {$catText}",
                 'finished_at' => $completionData['latest_finished_at'],
                 'completed_categories_count' => $count,
