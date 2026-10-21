@@ -38,6 +38,12 @@ class AuthService
 
             $user->load('playerProfile');
 
+            try {
+                app(AdminNotificationService::class)->notifyNewUser($user);
+            } catch (\Throwable $e) {
+                // Non-blocking notification dispatch
+            }
+
             return [
                 'user' => $user,
                 'token' => $token,
@@ -165,6 +171,12 @@ class AuthService
                     'avatar' => $avatar,
                 ]);
                 LegalAgreement::record($user, 'google');
+
+                try {
+                    app(AdminNotificationService::class)->notifyNewUser($user);
+                } catch (\Throwable $e) {
+                    // Non-blocking notification dispatch
+                }
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;

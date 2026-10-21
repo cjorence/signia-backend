@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\StoryController;
 use App\Http\Controllers\Api\AdminStoryController;
+use App\Http\Controllers\Api\AdminNotificationController;
 use App\Http\Controllers\Api\FinisherController;
 use App\Http\Controllers\Api\UserActivityController;
 use App\Http\Controllers\Api\CurriculumEventController;
@@ -227,5 +228,15 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/stories/{story}', [AdminStoryController::class, 'update']);
         Route::put('/stories/{story}', [AdminStoryController::class, 'update']);
         Route::delete('/stories/{story}', [AdminStoryController::class, 'destroy']);
+
+        // Admin Notifications & Preferences
+        Route::get('/notifications/settings', [AdminNotificationController::class, 'settings']);
+        Route::match(['put', 'patch', 'post'], '/notifications/settings', [AdminNotificationController::class, 'updateSettings']);
+        Route::get('/notifications', [AdminNotificationController::class, 'index']);
+        Route::post('/notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
+        Route::post('/notifications/read-all', [AdminNotificationController::class, 'markAllRead']);
+        Route::delete('/notifications/{id}', [AdminNotificationController::class, 'destroy']);
+        Route::post('/notifications/clear-all', [AdminNotificationController::class, 'clearAll']);
+        Route::post('/notifications/training-completed', [AdminNotificationController::class, 'reportTrainingComplete']);
     });
 });

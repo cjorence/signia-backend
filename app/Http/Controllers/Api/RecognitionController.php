@@ -100,6 +100,18 @@ class RecognitionController extends Controller
         if (! is_array($payload)) {
             return response()->json(['message' => 'Invalid recognition service response.'], 502);
         }
+
+        if (preg_match('#^api/train/status/#', $path) && ($payload['job']['status'] ?? '') === 'completed') {
+            try {
+                $category = $payload['job']['category'] ?? 'Gestures';
+                $accuracy = (float) ($payload['job']['results']['best_val_accuracy'] ?? $payload['job']['results']['accuracy'] ?? 0);
+                $modelPath = $payload['job']['results']['model_path'] ?? null;
+                app(\App\Services\AdminNotificationService::class)->notifyTrainingComplete($category, $accuracy, $modelPath);
+            } catch (\Throwable $e) {
+                // Non-blocking notification dispatch
+            }
+        }
+
         return response()->json($payload, $upstream->status())->header('Cache-Control', 'no-store');
     }
 }

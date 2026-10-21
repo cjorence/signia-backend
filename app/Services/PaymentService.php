@@ -257,6 +257,12 @@ class PaymentService
                     $purchase,
                     ['checkout_session_id' => $checkoutSessionId]
                 );
+
+                try {
+                    app(\App\Services\AdminNotificationService::class)->notifyHeartPurchase($purchase, $purchase->user);
+                } catch (\Throwable $e) {
+                    // Non-blocking notification dispatch
+                }
             }
 
             return $purchase->fresh()->load(['user', 'paymentTransactions', 'story']);
