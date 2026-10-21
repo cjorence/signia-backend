@@ -49,15 +49,14 @@ class SupportController extends Controller
                     // Log receipt error without failing the main submission
                     Log::warning('Failed to send support confirmation receipt to user', [
                         'user_id' => $user->id,
-                        'email' => $user->email,
-                        'error' => $receiptEx->getMessage(),
+                        'exception_type' => get_class($receiptEx),
                     ]);
                 }
             }
         } catch (\Throwable $e) {
             Log::error('Failed to send in-app support email', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
+                'exception_type' => get_class($e),
             ]);
 
             return response()->json([
@@ -98,8 +97,7 @@ class SupportController extends Controller
             );
         } catch (\Throwable $e) {
             Log::error('Failed to send public contact inquiry', [
-                'sender_email' => $senderEmail,
-                'error' => $e->getMessage(),
+                'exception_type' => get_class($e),
             ]);
 
             return response()->json([

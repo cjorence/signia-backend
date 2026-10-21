@@ -24,7 +24,7 @@ return [
         'auth/*',
     ],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     // Set the deployed frontend origins explicitly; separate multiple origins with commas.
     'allowed_origins' => array_values(array_filter(array_map('trim', explode(',',
@@ -33,9 +33,9 @@ return [
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With', 'X-XSRF-TOKEN'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => ['X-Request-ID'],
 
     'max_age' => 0,
 

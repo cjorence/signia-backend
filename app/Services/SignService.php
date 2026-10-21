@@ -339,7 +339,7 @@ class SignService
                 @unlink($tempPath);
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Video optimization failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Video optimization failed', ['exception_type' => get_class($e)]);
         }
     }
 
@@ -375,7 +375,7 @@ class SignService
                 @unlink($tempPath);
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Video transcoding failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Video transcoding failed', ['exception_type' => get_class($e)]);
         }
 
         return null;

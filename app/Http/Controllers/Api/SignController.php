@@ -198,7 +198,7 @@ class SignController extends Controller
     public function convertVideo(Request $request)
     {
         $request->validate([
-            'video' => ['required', 'file', 'max:102400'],
+            'video' => ['required', 'file', 'mimes:mp4,mov,avi,webm,mkv', 'max:102400'],
         ]);
 
         $file = $request->file('video');

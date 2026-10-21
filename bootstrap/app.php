@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Bearer-token API auth only. Do not enable Sanctum stateful SPA cookies here,
         // because that makes API login require CSRF.
         $middleware->prependToGroup('api', ForceJsonResponse::class);
+        $middleware->prependToGroup('api', \App\Http\Middleware\TrackApiFailures::class);
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
@@ -27,6 +28,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->report(function (\Throwable $error) {
+            // Preserve detailed local diagnostics; production API logs use safe fields.
+            $request = request();
+            if (app()->environment('production') && $request->attributes->has('diagnostic_request_id')) {
+                \App\Support\ApiDiagnostics::report($error, $request);
+
+                return false; // Prevent Laravel also logging the raw exception.
+            }
+        });
+
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([

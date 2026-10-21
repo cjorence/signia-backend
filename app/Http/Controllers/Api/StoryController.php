@@ -138,9 +138,10 @@ class StoryController extends Controller
                 'errors' => $e->errors(),
             ], 403);
         } catch (\Throwable $e) {
+            \App\Support\ApiDiagnostics::report($e, $request);
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to serve package: ' . $e->getMessage(),
+                'message' => 'Unable to serve package. Please try again later.',
             ], 403);
         }
 

@@ -106,7 +106,7 @@ class AuthController extends Controller
         try {
             Mail::to($email)->send(new VerificationCodeMail($code, $name));
         } catch (\Throwable $e) {
-            Log::warning("Could not send verification email to {$email}: " . $e->getMessage());
+            Log::warning('Verification email delivery failed', ['exception_type' => get_class($e)]);
             EmailVerificationCode::where('email', $email)->where('code', $code)->delete();
 
             return response()->json([
@@ -278,7 +278,7 @@ class AuthController extends Controller
         try {
             Mail::to($email)->send(new PasswordResetCodeMail($code, $user->name));
         } catch (\Throwable $e) {
-            Log::error("Failed to send password reset email to {$email}: " . $e->getMessage());
+            Log::error('Password reset email delivery failed', ['exception_type' => get_class($e)]);
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to send password reset code to this email at the moment. Please verify your email or try again later.',
@@ -669,7 +669,7 @@ class AuthController extends Controller
                 return (bool) ($result['success'] ?? false);
             }
         } catch (\Throwable $e) {
-            Log::warning('Turnstile verification exception: ' . $e->getMessage());
+            Log::warning('Turnstile verification failed', ['exception_type' => get_class($e)]);
         }
 
         return false;

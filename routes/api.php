@@ -28,10 +28,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::prefix('auth')->group(function () {
-    Route::post('/send-code', [AuthController::class, 'sendVerificationCode'])->middleware('throttle:5,1');
+    Route::post('/send-code', [AuthController::class, 'sendVerificationCode'])->middleware(['throttle:5,1', \App\Http\Middleware\EnsureProductionSecurity::class]);
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
-    Route::post('/forgot-password', [AuthController::class, 'sendPasswordResetCode'])->middleware('throttle:5,1');
+    Route::post('/forgot-password', [AuthController::class, 'sendPasswordResetCode'])->middleware(['throttle:5,1', \App\Http\Middleware\EnsureProductionSecurity::class]);
     Route::post('/verify-reset-code', [AuthController::class, 'verifyPasswordResetCode'])->middleware('throttle:10,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
     Route::post('/google', [AuthController::class, 'google'])->middleware('throttle:10,1');
@@ -64,6 +64,7 @@ Route::get('/platform/maintenance', [AdminController::class, 'getMaintenance']);
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    Route::post('/recognition/predict', [\App\Http\Controllers\Api\RecognitionController::class, 'predict'])->middleware('throttle:300,1,recognition-predict');
 
     // Auth
     Route::prefix('auth')->group(function () {
@@ -110,15 +111,15 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/hearts/transactions', [HeartController::class, 'transactions']);
         Route::post('/hearts/refill', [HeartController::class, 'refill']);
 
-        Route::post('/purchases/checkout', [PurchaseController::class, 'checkout']);
+        Route::post('/purchases/checkout', [PurchaseController::class, 'checkout'])->middleware('throttle:10,1,checkout');
         Route::post('/purchases', [PurchaseController::class, 'store']);
         Route::get('/purchases', [PurchaseController::class, 'userPurchases']);
         Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
-        Route::post('/purchases/{purchase}/verify', [PurchaseController::class, 'verify']);
+        Route::post('/purchases/{purchase}/verify', [PurchaseController::class, 'verify'])->middleware('throttle:30,1,payment-verify');
         Route::post('/purchases/{purchase}/refund-request', [RefundController::class, 'store']);
         Route::get('/refund-requests', [RefundController::class, 'userIndex']);
 
-        Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout']);
+        Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout'])->middleware('throttle:10,1,checkout');
         Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
         Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
 
@@ -137,6 +138,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::post('/recognition/api/train/start', [\App\Http\Controllers\Api\RecognitionController::class, 'admin'])
+            ->defaults('path', 'api/train/start')->middleware('throttle:2,1,recognition-train');
+        Route::post('/recognition/api/train/upload_video', [\App\Http\Controllers\Api\RecognitionController::class, 'admin'])
+            ->defaults('path', 'api/train/upload_video')->middleware('throttle:10,1,recognition-upload');
+        Route::get('/recognition/{path}', [\App\Http\Controllers\Api\RecognitionController::class, 'admin'])
+            ->where('path', '.*')->middleware('throttle:120,1,recognition-admin');
 
         // Levels
         Route::get('/levels/archived', [LevelController::class, 'archived']);
@@ -154,7 +161,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/signs/bulk-archive', [SignController::class, 'bulkArchive']);
         Route::post('/signs/bulk-restore', [SignController::class, 'bulkRestore']);
         Route::post('/signs/bulk-force-delete', [SignController::class, 'bulkForceDestroy']);
-        Route::post('/signs/convert-video', [SignController::class, 'convertVideo']);
+        Route::post('/signs/convert-video', [SignController::class, 'convertVideo'])->middleware('throttle:10,1,video-convert');
         Route::post('/signs/{sign}/archive', [SignController::class, 'archive']);
         Route::post('/signs/{id}/restore', [SignController::class, 'restore']);
         Route::delete('/signs/{id}/force', [SignController::class, 'forceDestroy']);

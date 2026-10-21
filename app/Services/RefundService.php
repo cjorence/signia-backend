@@ -77,7 +77,7 @@ class RefundService
                 Mail::to($user->email)->send(new RefundRequestSubmittedMail($refundRequest));
             }
         } catch (\Throwable $e) {
-            Log::warning("Could not send refund request confirmation to user {$user->email}: ".$e->getMessage());
+            Log::warning('Refund confirmation email failed', ['user_id' => $user->id, 'exception_type' => get_class($e)]);
         }
 
         // Send alert to Dedicated System / Admin Support Email
@@ -87,7 +87,7 @@ class RefundService
                 Mail::to($adminEmail)->send(new RefundRequestAdminAlertMail($refundRequest));
             }
         } catch (\Throwable $e) {
-            Log::warning("Could not send refund alert to admin {$adminEmail}: ".$e->getMessage());
+            Log::warning('Refund admin alert failed', ['exception_type' => get_class($e)]);
         }
 
         return $refundRequest;
@@ -248,7 +248,7 @@ class RefundService
             }
         } catch (\Throwable $e) {
             $status = 'failed';
-            Log::warning('Refund status email failed', ['refund_request_id' => $request->id, 'error' => $e->getMessage()]);
+            Log::warning('Refund status email failed', ['refund_request_id' => $request->id, 'exception_type' => get_class($e)]);
         }
         $request->update(['email_delivery_status' => $status]);
     }
@@ -306,7 +306,7 @@ class RefundService
                     $this->sendStatusEmail($updated);
                 }
             } catch (\Throwable $e) {
-                Log::warning('Refund reconciliation failed', ['refund_request_id' => $request->id, 'error' => $e->getMessage()]);
+                Log::warning('Refund reconciliation failed', ['refund_request_id' => $request->id, 'exception_type' => get_class($e)]);
             }
         }
     }
