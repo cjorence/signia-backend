@@ -195,6 +195,12 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $user = $result['user'] ?? null;
+        if ($user && $user->role === 'admin') {
+            $ip = $request->ip() ?: 'Unknown IP';
+            app(\App\Services\AdminService::class)->logAction($user, "Successful admin session login from IP {$ip}");
+        }
+
         return response()->json([
             'success'    => true,
             'message'    => 'Login successful.',
@@ -540,6 +546,12 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Your account has been deactivated. Please contact support.',
             ], 403);
+        }
+
+        $user = $result['user'] ?? null;
+        if ($user && $user->role === 'admin') {
+            $ip = $request->ip() ?: 'Unknown IP';
+            app(\App\Services\AdminService::class)->logAction($user, "Successful admin session login from IP {$ip}");
         }
 
         return response()->json([
