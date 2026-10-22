@@ -214,13 +214,17 @@ class SignSeeder extends Seeder
             'Y' => 'Extend your thumb and little finger outward while keeping your index, middle, and ring fingers curled into your palm.',
 
             'Z' => 'Extend your index finger and use it to trace the shape of the letter Z in the air.',
+
+            'Ñ' => 'Form the letter N handshape and wave your hand gently from side to side to represent the tilde.',
+
+            'NG' => 'Form the letter N handshape and transition into the letter G handshape in a smooth motion.',
         ];
 
         $alphabetOrder = 1;
 
         foreach ($alphabetDescriptions as $letter => $description) {
             $existing = Sign::where('level_id', $alphabetLevel->id)
-                ->where('name', "Letter {$letter}")
+                ->whereRaw('BINARY name = ?', ["Letter {$letter}"])
                 ->first();
 
             // Detect image on disk (.webp, .png, .jpg)
@@ -241,27 +245,33 @@ class SignSeeder extends Seeder
                 }
             }
 
-            Sign::updateOrCreate(
-                [
+            $isFilipinoMotionSign = in_array($letter, ['Ñ', 'NG'], true);
+
+            $payload = [
+                'fsl_name' => $letter,
+                'model_label' => $isFilipinoMotionSign ? 'alphabet-fil' : 'alphabet',
+                'is_motion' => $isFilipinoMotionSign || in_array($letter, ['J', 'Z'], true),
+                'description' => $description,
+                'difficulty' => 'easy',
+                'xp_reward' => 10,
+                'sort_order' => $alphabetOrder,
+                'video_type' => $existing?->video_type ?? 'local',
+                'video_start' => $existing?->video_start ?? null,
+                'video_end' => $existing?->video_end ?? null,
+
+                // Preserve existing uploaded media, or use detected disk file
+                'video_url' => $existing?->video_url ?? $detectedVideo,
+                'image_url' => $existing?->image_url ?? $detectedImage,
+            ];
+
+            if ($existing) {
+                $existing->update($payload);
+            } else {
+                Sign::create(array_merge([
                     'level_id' => $alphabetLevel->id,
                     'name' => "Letter {$letter}",
-                ],
-                [
-                    'fsl_name' => $letter,
-                    'model_label' => 'alphabet',
-                    'description' => $description,
-                    'difficulty' => 'easy',
-                    'xp_reward' => 10,
-                    'sort_order' => $alphabetOrder,
-                    'video_type' => $existing?->video_type ?? 'local',
-                    'video_start' => $existing?->video_start ?? null,
-                    'video_end' => $existing?->video_end ?? null,
-
-                    // Preserve existing uploaded media, or use detected disk file
-                    'video_url' => $existing?->video_url ?? $detectedVideo,
-                    'image_url' => $existing?->image_url ?? $detectedImage,
-                ]
-            );
+                ], $payload));
+            }
 
             $alphabetOrder++;
         }
@@ -387,7 +397,7 @@ class SignSeeder extends Seeder
             /*
             | Skip alphabet if it exists in the CSV
             */
-            if ($category === 'ALPHABET') {
+            if ($category === 'ALPHABET' || $category === 'ALPHABET-FIL') {
                 continue;
             }
 
