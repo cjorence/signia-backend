@@ -158,6 +158,8 @@ class RefundService
             throw ValidationException::withMessages(['refund' => 'This refund is already being processed. Please wait and refresh.']);
         }
 
+        app(AdminService::class)->logAction($admin, "Approved refund request #{$refundRequest->id}");
+
         return $result;
     }
 
@@ -232,6 +234,8 @@ class RefundService
             return $request;
         });
         $this->sendStatusEmail($result);
+
+        app(AdminService::class)->logAction($admin, "Declined refund request #{$refundRequest->id}");
 
         return $result->fresh(['user', 'purchase', 'reviewer']);
     }

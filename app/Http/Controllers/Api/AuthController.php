@@ -414,6 +414,15 @@ class AuthController extends Controller
         }
         $user->save();
 
+        if ($user->role === 'admin') {
+            if (!empty($validated['password'])) {
+                app(\App\Services\AdminService::class)->logAction($user, 'Admin updated account password');
+            }
+            if (isset($validated['name']) && trim($validated['name']) !== '') {
+                app(\App\Services\AdminService::class)->logAction($user, "Admin updated display name to '{$user->name}'");
+            }
+        }
+
         // Single-use guarantee: remove the token immediately
         DB::table('password_reset_tokens')->where('email', $email)->delete();
 
@@ -613,6 +622,15 @@ class AuthController extends Controller
         }
 
         $user->save();
+
+        if ($user->role === 'admin') {
+            if (!empty($validated['password'])) {
+                app(\App\Services\AdminService::class)->logAction($user, 'Admin updated account password');
+            }
+            if (isset($validated['name']) && trim($validated['name']) !== '') {
+                app(\App\Services\AdminService::class)->logAction($user, "Admin updated display name to '{$user->name}'");
+            }
+        }
 
         if (array_key_exists('avatar', $validated)) {
             $profile = $user->playerProfile;

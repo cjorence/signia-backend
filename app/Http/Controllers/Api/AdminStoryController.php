@@ -106,6 +106,10 @@ class AdminStoryController extends Controller
 
         CurriculumEventService::record('story-added', $story->id, $story->title);
 
+        if ($admin = auth()->user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, "Created story chapter '{$story->title}'");
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Story chapter created successfully.',
@@ -209,6 +213,10 @@ class AdminStoryController extends Controller
 
         $story->save();
 
+        if ($admin = auth()->user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, "Updated story chapter '{$story->title}'");
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Story chapter updated successfully.',
@@ -235,6 +243,10 @@ class AdminStoryController extends Controller
         $reason = $request->input('reason');
         $story->delete();
         CurriculumEventService::record('story-archived', $story->id, $story->title, $reason);
+
+        if ($admin = auth()->user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, "Archived story chapter '{$story->title}'");
+        }
 
         return response()->json([
             'success' => true,

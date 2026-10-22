@@ -10,6 +10,8 @@ use App\Models\QuizAttempt;
 use App\Models\Sign;
 use App\Models\Story;
 use App\Models\User;
+use App\Models\UserAchievement;
+use App\Models\UserStoryProgress;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -258,9 +260,46 @@ class AdminService
             ];
         }
 
+        // 5. Gamification - Unlocked Achievements
+        $recentAchievements = UserAchievement::with(['user', 'achievement'])
+            ->latest('unlocked_at')
+            ->take(3)
+            ->get();
+        foreach ($recentAchievements as $a) {
+            $achievementName = $a->achievement?->name ?? 'Achievement';
+            $userName = $a->user?->name ?? 'User';
+            $timeVal = $a->unlocked_at ?? $a->created_at;
+            $recentActivities[] = [
+                'id' => 'achievement_' . $a->id,
+                'type' => 'achievement',
+                'text' => "{$userName} unlocked '{$achievementName}'",
+                'time' => $timeVal ? $timeVal->diffForHumans() : 'Recently',
+                'timestamp' => $timeVal ? $timeVal->timestamp : 0,
+            ];
+        }
+
+        // 6. Story Quest Milestones
+        $recentStories = UserStoryProgress::where('status', 'completed')
+            ->with(['user', 'story'])
+            ->latest('completed_at')
+            ->take(3)
+            ->get();
+        foreach ($recentStories as $s) {
+            $storyTitle = $s->story?->title ?? 'Story Chapter';
+            $userName = $s->user?->name ?? 'User';
+            $timeVal = $s->completed_at ?? $s->updated_at;
+            $recentActivities[] = [
+                'id' => 'story_' . $s->id,
+                'type' => 'story',
+                'text' => "{$userName} completed Story '{$storyTitle}'",
+                'time' => $timeVal ? $timeVal->diffForHumans() : 'Recently',
+                'timestamp' => $timeVal ? $timeVal->timestamp : 0,
+            ];
+        }
+
         // Sort descending by timestamp
         usort($recentActivities, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
-        $recentActivities = array_slice($recentActivities, 0, 5);
+        $recentActivities = array_slice($recentActivities, 0, 8);
 
         return [
             'total_users' => $totalUsers,

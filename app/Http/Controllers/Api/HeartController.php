@@ -74,6 +74,11 @@ class HeartController extends Controller
             ['admin_id' => Auth::id()]
         );
 
+        if ($admin = Auth::user()) {
+            $amt = $request->validated('amount');
+            app(\App\Services\AdminService::class)->logAction($admin, "Granted {$amt} hearts to user ID {$user->id}");
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Hearts granted successfully.',
@@ -108,6 +113,10 @@ class HeartController extends Controller
                 ['admin_id' => Auth::id(), 'bulk' => true]
             );
             $count++;
+        }
+
+        if ($admin = Auth::user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, "Bulk granted {$amount} hearts to {$count} player" . ($count === 1 ? '' : 's'));
         }
 
         return response()->json([
