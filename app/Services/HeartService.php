@@ -143,12 +143,16 @@ class HeartService
                 ]);
             }
 
-            $refillAmount = min($requestedAmount ?? $availableSpace, $availableSpace);
+            if ($requestedAmount !== null) {
+                if ($profile->heart_inventory < $requestedAmount) {
+                    throw ValidationException::withMessages([
+                        'heart_inventory' => 'You do not have enough heart inventory for that refill.',
+                    ]);
+                }
 
-            if ($profile->heart_inventory < $refillAmount) {
-                throw ValidationException::withMessages([
-                    'heart_inventory' => 'You do not have enough heart inventory for that refill.',
-                ]);
+                $refillAmount = min($requestedAmount, $availableSpace);
+            } else {
+                $refillAmount = min($availableSpace, $profile->heart_inventory);
             }
 
             $newHearts = $profile->hearts + $refillAmount;

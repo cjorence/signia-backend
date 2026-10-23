@@ -62,6 +62,23 @@ class HeartInventoryTest extends TestCase
         ]);
     }
 
+    public function test_inventory_refill_uses_partial_inventory_when_inventory_is_less_than_empty_space(): void
+    {
+        // 0 hearts, 5 max_hearts -> empty space is 5. User only has 4 extra hearts.
+        $user = $this->player(0, 4);
+
+        $profile = app(HeartService::class)->refillFromInventory($user);
+
+        $this->assertSame(4, $profile->hearts);
+        $this->assertSame(0, $profile->heart_inventory);
+        $this->assertDatabaseHas('heart_transactions', [
+            'user_id' => $user->id,
+            'type' => 'inventory_refill',
+            'amount' => -4,
+            'reason' => 'inventory_to_usable_hearts',
+        ]);
+    }
+
     public function test_refill_rejects_a_requested_amount_above_available_inventory(): void
     {
         $user = $this->player(1, 2);
