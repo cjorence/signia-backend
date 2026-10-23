@@ -116,5 +116,6 @@ return [
     ],
 
     'support_address' => env('MAIL_SUPPORT_ADDRESS', 'signiafsl@gmail.com'),
+    'admin_support_address' => env('ADMIN_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
 
 ];

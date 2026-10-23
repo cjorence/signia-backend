@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException('Demo accounts are prohibited in production. Import approved curriculum and promote a verified account separately.');
+        }
         // User::factory(10)->create();
 
         $admin = User::updateOrCreate(

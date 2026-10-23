@@ -82,7 +82,7 @@ class RefundService
 
         // Send alert to Dedicated System / Admin Support Email
         try {
-            $adminEmail = env('ADMIN_SUPPORT_EMAIL') ?: config('mail.from.address');
+            $adminEmail = config('mail.admin_support_address') ?: config('mail.from.address');
             if (! empty($adminEmail)) {
                 Mail::to($adminEmail)->send(new RefundRequestAdminAlertMail($refundRequest));
             }
