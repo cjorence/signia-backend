@@ -345,12 +345,39 @@ class AdminStoryController extends Controller
             ]);
         }
 
-        // Safety check: ensure no student progress or purchases are tied to this story
-        if ($story->unlocks()->exists() || $story->purchases()->exists() || $story->progress()->exists()) {
+        // Safety check 1: ensure no active in-flight checkout is occurring right now (within last 30 minutes)
+        $recentPending = $story->purchases()
+            ->where('status', 'pending')
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->latest('created_at')
+            ->first();
+
+        if ($recentPending) {
+            $minutesAgo = max(1, (int) round($recentPending->created_at->diffInMinutes(now())));
+            throw ValidationException::withMessages([
+                'story' => "Cannot permanently delete chapter \"{$story->title}\" because a checkout session was initiated {$minutesAgo} minute(s) ago and may still be in progress. Please wait for the payment session to finish or expire before deleting.",
+            ]);
+        }
+
+        // Safety check 2: ensure no real student progress or paid purchases are tied to this story
+        $hasPaidPurchases = $story->purchases()->whereIn('status', ['paid', 'refunded'])->exists();
+        $hasStudentUnlocks = $story->unlocks()->whereHas('user', function ($q) {
+            $q->where('role', '!=', 'admin');
+        })->exists();
+        $hasStudentProgress = $story->progress()->whereHas('user', function ($q) {
+            $q->where('role', '!=', 'admin');
+        })->exists();
+
+        if ($hasPaidPurchases || $hasStudentUnlocks || $hasStudentProgress) {
             throw ValidationException::withMessages([
                 'story' => "Cannot permanently delete chapter \"{$story->title}\" because student unlock, purchase, or progress records are attached to it. Please keep it archived instead.",
             ]);
         }
+
+        // Clean up pending/abandoned/failed checkout records and any admin test records
+        $story->purchases()->whereIn('status', ['pending', 'failed', 'cancelled'])->delete();
+        $story->unlocks()->delete();
+        $story->progress()->delete();
 
         if ($story->cover_url && file_exists(public_path(ltrim($story->cover_url, '/')))) {
             @unlink(public_path(ltrim($story->cover_url, '/')));
@@ -361,6 +388,10 @@ class AdminStoryController extends Controller
         }
 
         $story->forceDelete();
+
+        if ($admin = auth()->user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, "Permanently deleted story chapter '{$story->title}'");
+        }
 
         return response()->json([
             'success' => true,
@@ -378,12 +409,35 @@ class AdminStoryController extends Controller
         $stories = Story::withTrashed()->whereIn('id', $validated['ids'])->get();
 
         $blocked = [];
+        $activeCheckoutBlocked = [];
         foreach ($stories as $story) {
+            $hasActiveCheckout = $story->purchases()
+                ->where('status', 'pending')
+                ->where('created_at', '>=', now()->subMinutes(30))
+                ->exists();
+
+            $hasPaidPurchases = $story->purchases()->whereIn('status', ['paid', 'refunded'])->exists();
+            $hasStudentUnlocks = $story->unlocks()->whereHas('user', function ($q) {
+                $q->where('role', '!=', 'admin');
+            })->exists();
+            $hasStudentProgress = $story->progress()->whereHas('user', function ($q) {
+                $q->where('role', '!=', 'admin');
+            })->exists();
+
             if ($story->chapter_number === 1) {
                 $blocked[] = "Chapter 1 ({$story->title}) is protected";
-            } elseif ($story->unlocks()->exists() || $story->purchases()->exists() || $story->progress()->exists()) {
+            } elseif ($hasActiveCheckout) {
+                $activeCheckoutBlocked[] = $story->title;
+            } elseif ($hasPaidPurchases || $hasStudentUnlocks || $hasStudentProgress) {
                 $blocked[] = $story->title;
             }
+        }
+
+        if (!empty($activeCheckoutBlocked)) {
+            $names = implode(', ', array_slice($activeCheckoutBlocked, 0, 5));
+            throw ValidationException::withMessages([
+                'stories' => "Cannot permanently delete story chapter(s) ({$names}) because active checkout sessions were initiated within the last 30 minutes and may be in progress. Please wait for them to finish or expire.",
+            ]);
         }
 
         if (!empty($blocked)) {
@@ -398,6 +452,10 @@ class AdminStoryController extends Controller
 
         $deletedIds = [];
         foreach ($stories as $story) {
+            $story->purchases()->whereIn('status', ['pending', 'failed', 'cancelled'])->delete();
+            $story->unlocks()->delete();
+            $story->progress()->delete();
+
             if ($story->cover_url && file_exists(public_path(ltrim($story->cover_url, '/')))) {
                 @unlink(public_path(ltrim($story->cover_url, '/')));
             }
@@ -408,6 +466,10 @@ class AdminStoryController extends Controller
 
             $story->forceDelete();
             $deletedIds[] = $story->id;
+        }
+
+        if ($admin = auth()->user()) {
+            app(\App\Services\AdminService::class)->logAction($admin, 'Bulk permanently deleted ' . count($deletedIds) . ' story chapter(s)');
         }
 
         return response()->json([
