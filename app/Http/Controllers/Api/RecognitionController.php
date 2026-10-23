@@ -30,11 +30,18 @@ class RecognitionController extends Controller
 
     public function admin(Request $request, string $path)
     {
-        $get = in_array($path, ['api/train/labels', 'api/train/stats', 'models', 'modes'], true)
+        $get = in_array($path, ['api/train/capabilities', 'api/train/labels', 'api/train/stats', 'models', 'modes'], true)
             || preg_match('#^api/train/status/[a-f0-9-]{36}$#D', $path);
         $download = preg_match('#^model_file/([A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.(pt|pth|keras|pkl|json|npy)$#D', $path);
         if ($request->isMethod('get') && ($get || $download)) {
             return $this->forward($path, 'GET', [], null, (bool) $download);
+        }
+        if ($request->isMethod('post') && in_array($path, ['api/train/start', 'api/train/upload_video'], true)
+            && config('recognition.training_enabled') !== true) {
+            return response()->json([
+                'status' => 'error', 'code' => 'training_disabled',
+                'message' => 'Hosted training is disabled. Use the local admin setup to collect data and train. Recognition remains available.',
+            ], 409)->header('Cache-Control', 'no-store');
         }
         if ($request->isMethod('post') && $path === 'api/train/start') {
             $data = $request->validate(['category' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_ -]+$/']]);
@@ -99,6 +106,11 @@ class RecognitionController extends Controller
         $payload = $upstream->json();
         if (! is_array($payload)) {
             return response()->json(['message' => 'Invalid recognition service response.'], 502);
+        }
+
+        if ($path === 'api/train/capabilities' && $upstream->successful()) {
+            $payload['training_enabled'] = config('recognition.training_enabled') === true
+                && ($payload['training_enabled'] ?? false) === true;
         }
 
         if ($upstream->successful() && preg_match('#^api/train/status/#', $path) && ($payload['job']['status'] ?? '') === 'completed') {
