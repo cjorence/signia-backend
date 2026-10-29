@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Addresses come from config/trustedproxy.php. Ignore forwarded host,
+        // port and prefix; Caddy preserves the canonical Host header itself.
+        $middleware->trustProxies(headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO);
+
         // Bearer-token API auth only. Do not enable Sanctum stateful SPA cookies here,
         // because that makes API login require CSRF.
         $middleware->prependToGroup('api', ForceJsonResponse::class);

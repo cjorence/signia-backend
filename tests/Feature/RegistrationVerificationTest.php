@@ -102,6 +102,7 @@ class RegistrationVerificationTest extends TestCase
             ]);
 
         $this->assertDatabaseHas('users', ['email' => 'learner@gmail.com']);
+        $this->assertNotNull(User::where('email', 'learner@gmail.com')->firstOrFail()->email_verified_at);
         $this->assertDatabaseMissing('email_verification_codes', ['email' => 'learner@gmail.com']);
     }
 }

@@ -22,10 +22,11 @@ class AuthService
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => $data['password'],
-                'email_verified_at' => now(),
                 'last_active_at' => now(),
                 'is_active' => true,
             ]);
+            // Verification is server-controlled and intentionally not mass assignable.
+            $user->forceFill(['email_verified_at' => now()])->save();
 
             $user->playerProfile()->create([
                 'current_level' => 1,
@@ -158,11 +159,11 @@ class AuthService
                     'name' => $name,
                     'email' => $email,
                     'google_id' => $googleId,
-                    'email_verified_at' => now(),
                     'last_active_at' => now(),
                     'is_active' => true,
                     'role' => 'user',
                 ]);
+                $user->forceFill(['email_verified_at' => now()])->save();
 
                 $user->playerProfile()->create([
                     'current_level' => 1,
