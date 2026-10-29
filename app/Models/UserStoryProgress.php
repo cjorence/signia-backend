@@ -16,11 +16,21 @@ class UserStoryProgress extends Model
         'user_id',
         'story_id',
         'status',
+        'progress_percent',
+        'current_step',
+        'total_steps',
+        'save_state',
         'completed_at',
+        'last_played_at',
     ];
 
     protected $casts = [
         'completed_at' => 'datetime',
+        'last_played_at' => 'datetime',
+        'progress_percent' => 'integer',
+        'current_step' => 'integer',
+        'total_steps' => 'integer',
+        'save_state' => 'array',
     ];
 
     public function user(): BelongsTo

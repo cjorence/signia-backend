@@ -88,6 +88,26 @@ class StoryController extends Controller
         ], 200);
     }
 
+    public function updateProgress(Request $request, Story $story): JsonResponse
+    {
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'current_step' => ['required', 'integer', 'min:0'],
+            'total_steps' => ['required', 'integer', 'min:1'],
+            'save_state' => ['nullable', 'array'],
+            'status' => ['nullable', 'string', 'in:in_progress,completed'],
+        ]);
+
+        $result = $this->storyService->updateStoryProgress($user, $story, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Story progress updated successfully.',
+            'data' => $result,
+        ], 200);
+    }
+
     public function launchTicket(Request $request, Story $story): JsonResponse
     {
         $user = Auth::user();
