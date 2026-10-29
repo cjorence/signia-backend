@@ -83,6 +83,21 @@ class StoryProgressTest extends TestCase
             ->assertOk()->assertJsonPath('data.status', 'in_progress')->assertJsonPath('data.progress_percent', 99);
     }
 
+    public function test_completed_rows_from_before_migration_keep_completion_in_save_response(): void
+    {
+        $story = $this->story();
+        $player = User::factory()->create();
+        $oldTime = now()->subYear()->startOfSecond();
+        UserStoryProgress::create(['user_id' => $player->id, 'story_id' => $story->id,
+            'status' => 'completed', 'completed_at' => $oldTime]);
+        Sanctum::actingAs($player);
+        $this->postJson("/api/user/stories/{$story->id}/progress", $this->progress(1))
+            ->assertOk()->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.progress_percent', 100)->assertJsonPath('data.current_step', 3)
+            ->assertJsonPath('data.total_steps', 3);
+        $this->assertSame($oldTime->toISOString(), UserStoryProgress::firstOrFail()->completed_at->toISOString());
+    }
+
     public function test_invalid_step_bounds_are_rejected(): void
     {
         $story = $this->story();

@@ -164,14 +164,18 @@ class StoryService
                 ]
             );
 
+            // Pre-migration completed rows have zero defaults in the new columns.
+            // Report their completion consistently without rewriting saved history.
+            $completed = $progress->status === 'completed';
+            $responseTotal = max(1, (int) ($progress->total_steps ?: $story->episodes));
             return [
                 'success' => true,
                 'story_id' => $story->id,
                 'chapter_number' => $story->chapter_number,
                 'status' => $progress->status,
-                'progress_percent' => $progress->progress_percent,
-                'current_step' => $progress->current_step,
-                'total_steps' => $progress->total_steps,
+                'progress_percent' => $completed ? 100 : $progress->progress_percent,
+                'current_step' => $completed ? $responseTotal : $progress->current_step,
+                'total_steps' => $responseTotal,
                 'save_state' => $progress->save_state,
             ];
         });
