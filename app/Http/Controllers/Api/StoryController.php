@@ -93,8 +93,8 @@ class StoryController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'current_step' => ['required', 'integer', 'min:0'],
-            'total_steps' => ['required', 'integer', 'min:1'],
+            'current_step' => ['required', 'integer', 'min:0', 'max:2147483647', 'lte:total_steps'],
+            'total_steps' => ['required', 'integer', 'min:1', 'max:2147483647'],
             'save_state' => ['nullable', 'array'],
             'status' => ['nullable', 'string', 'in:in_progress,completed'],
         ]);

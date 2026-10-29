@@ -45,11 +45,11 @@ class StoryService
 
             $progressRecord = $userProgressByStory[$story->id] ?? null;
             $percent = $isCompleted ? 100 : (int) ($progressRecord?->progress_percent ?? 0);
-            $currentStep = $isCompleted ? ($story->episodes ?? 1) : (int) ($progressRecord?->current_step ?? 0);
             $totalSteps = (int) ($progressRecord?->total_steps ?? ($story->episodes ?? 1));
             if ($totalSteps <= 0) {
                 $totalSteps = max(1, (int) ($story->episodes ?? 1));
             }
+            $currentStep = $isCompleted ? $totalSteps : (int) ($progressRecord?->current_step ?? 0);
 
             $progressData = [
                 'percent' => $percent,
@@ -132,41 +132,37 @@ class StoryService
 
     public function updateStoryProgress(User $user, Story $story, array $data): array
     {
+        if (! $story->isUnlockedFor($user)) {
+            throw ValidationException::withMessages(['story' => 'You must unlock this chapter to save progress.']);
+        }
+
         return DB::transaction(function () use ($user, $story, $data) {
+            // Serialize saves and completion, including the first progress row.
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $existing = UserStoryProgress::where('user_id', $user->id)->where('story_id', $story->id)->first();
             $currentStep = (int) ($data['current_step'] ?? 0);
             $totalSteps = max(1, (int) ($data['total_steps'] ?? 1));
             $saveState = isset($data['save_state']) && is_array($data['save_state']) ? $data['save_state'] : null;
 
-            $percent = min(100, max(0, (int) round(($currentStep / $totalSteps) * 100)));
-            $isComplete = $percent >= 100 || ($data['status'] ?? '') === 'completed';
+            $percent = min(100, max(0, (int) floor(($currentStep / $totalSteps) * 100)));
+            $isComplete = $currentStep >= $totalSteps || ($data['status'] ?? '') === 'completed';
 
-            $progress = UserStoryProgress::updateOrCreate(
+            // A delayed request or replay must not erase a completed chapter.
+            $progress = $existing?->status === 'completed' ? $existing : UserStoryProgress::updateOrCreate(
                 [
                     'user_id' => $user->id,
                     'story_id' => $story->id,
                 ],
                 [
                     'status' => $isComplete ? 'completed' : 'in_progress',
-                    'progress_percent' => $percent,
-                    'current_step' => $currentStep,
+                    'progress_percent' => $isComplete ? 100 : $percent,
+                    'current_step' => $isComplete ? $totalSteps : $currentStep,
                     'total_steps' => $totalSteps,
                     'save_state' => $saveState,
                     'completed_at' => $isComplete ? now() : null,
                     'last_played_at' => now(),
                 ]
             );
-
-            if ($isComplete) {
-                $completedCount = UserStoryProgress::where('user_id', $user->id)
-                    ->where('status', 'completed')
-                    ->count();
-
-                if ($user->playerProfile) {
-                    $user->playerProfile->update([
-                        'stories_done' => $completedCount,
-                    ]);
-                }
-            }
 
             return [
                 'success' => true,
@@ -183,7 +179,14 @@ class StoryService
 
     public function completeStory(User $user, Story $story): array
     {
+        if (! $story->isUnlockedFor($user)) {
+            throw ValidationException::withMessages(['story' => 'You must unlock this chapter to complete it.']);
+        }
+
         return DB::transaction(function () use ($user, $story) {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $existing = UserStoryProgress::where('user_id', $user->id)->where('story_id', $story->id)->first();
+            $totalSteps = max(1, (int) ($existing?->total_steps ?: $story->episodes));
             $progress = UserStoryProgress::updateOrCreate(
                 [
                     'user_id' => $user->id,
@@ -192,21 +195,17 @@ class StoryService
                 [
                     'status' => 'completed',
                     'progress_percent' => 100,
-                    'completed_at' => now(),
+                    'current_step' => $totalSteps,
+                    'total_steps' => $totalSteps,
+                    'completed_at' => $existing?->completed_at ?? now(),
                     'last_played_at' => now(),
                 ]
             );
 
-            // Synchronize stories_done count on user player profile
+            // Profile responses derive this count from story progress records.
             $completedCount = UserStoryProgress::where('user_id', $user->id)
                 ->where('status', 'completed')
                 ->count();
-
-            if ($user->playerProfile) {
-                $user->playerProfile->update([
-                    'stories_done' => $completedCount,
-                ]);
-            }
 
             return [
                 'success' => true,
