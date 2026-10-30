@@ -123,6 +123,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/stories/{story}/checkout', [StoryController::class, 'checkout'])->middleware('throttle:10,1,checkout');
         Route::post('/stories/{story}/complete', [StoryController::class, 'complete']);
         Route::post('/stories/{story}/launch-ticket', [StoryController::class, 'launchTicket']);
+        Route::post('/stories/{story}/progress', [StoryController::class, 'updateProgress'])->middleware('throttle:60,1');
 
         Route::post('/support/message', [SupportController::class, 'sendMessage'])->middleware('throttle:10,1');
 

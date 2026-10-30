@@ -19,25 +19,46 @@ class StoryService
 
         $unlockedStoryIds = [];
         $completedStoryIds = [];
+        $userProgressByStory = [];
 
         if ($user) {
             $unlockedStoryIds = UserStoryUnlock::where('user_id', $user->id)
                 ->pluck('story_id')
                 ->all();
 
-            $completedStoryIds = UserStoryProgress::where('user_id', $user->id)
-                ->where('status', 'completed')
-                ->pluck('story_id')
-                ->all();
+            $userProgressRecords = UserStoryProgress::where('user_id', $user->id)->get();
+            foreach ($userProgressRecords as $rec) {
+                $userProgressByStory[$rec->story_id] = $rec;
+                if ($rec->status === 'completed') {
+                    $completedStoryIds[] = $rec->story_id;
+                }
+            }
         }
 
-        return $stories->map(function (Story $story) use ($user, $unlockedStoryIds, $completedStoryIds) {
+        return $stories->map(function (Story $story) use ($user, $unlockedStoryIds, $completedStoryIds, $userProgressByStory) {
             $isFree = (bool) $story->is_free || $story->chapter_number === 1;
             $isAdmin = $user && $user->role === 'admin';
             $isUnlocked = $isFree || $isAdmin || in_array($story->id, $unlockedStoryIds, true);
             $isCompleted = in_array($story->id, $completedStoryIds, true);
 
             $status = $isCompleted ? 'complete' : ($isUnlocked ? 'continue' : 'locked');
+
+            $progressRecord = $userProgressByStory[$story->id] ?? null;
+            $percent = $isCompleted ? 100 : (int) ($progressRecord?->progress_percent ?? 0);
+            $totalSteps = (int) ($progressRecord?->total_steps ?? ($story->episodes ?? 1));
+            if ($totalSteps <= 0) {
+                $totalSteps = max(1, (int) ($story->episodes ?? 1));
+            }
+            $currentStep = $isCompleted ? $totalSteps : (int) ($progressRecord?->current_step ?? 0);
+
+            $progressData = [
+                'percent' => $percent,
+                'current_step' => $currentStep,
+                'total_steps' => $totalSteps,
+                'save_state' => $progressRecord?->save_state,
+                'last_played_at' => $progressRecord?->last_played_at?->toIso8601String(),
+                'status' => $isCompleted ? 'completed' : ($percent > 0 ? 'in_progress' : 'not_started'),
+            ];
 
             return [
                 'id' => $story->id,
@@ -60,6 +81,7 @@ class StoryService
                 'is_completed' => $isCompleted,
                 'status' => $status,
                 'can_unlock_with_payment' => ! $isUnlocked && ! $isFree,
+                'progress' => $progressData,
             ];
         });
     }
@@ -108,9 +130,67 @@ class StoryService
         });
     }
 
+    public function updateStoryProgress(User $user, Story $story, array $data): array
+    {
+        if (! $story->isUnlockedFor($user)) {
+            throw ValidationException::withMessages(['story' => 'You must unlock this chapter to save progress.']);
+        }
+
+        return DB::transaction(function () use ($user, $story, $data) {
+            // Serialize saves and completion, including the first progress row.
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $existing = UserStoryProgress::where('user_id', $user->id)->where('story_id', $story->id)->first();
+            $currentStep = (int) ($data['current_step'] ?? 0);
+            $totalSteps = max(1, (int) ($data['total_steps'] ?? 1));
+            $saveState = isset($data['save_state']) && is_array($data['save_state']) ? $data['save_state'] : null;
+
+            $percent = min(100, max(0, (int) floor(($currentStep / $totalSteps) * 100)));
+            $isComplete = $currentStep >= $totalSteps || ($data['status'] ?? '') === 'completed';
+
+            // A delayed request or replay must not erase a completed chapter.
+            $progress = $existing?->status === 'completed' ? $existing : UserStoryProgress::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'story_id' => $story->id,
+                ],
+                [
+                    'status' => $isComplete ? 'completed' : 'in_progress',
+                    'progress_percent' => $isComplete ? 100 : $percent,
+                    'current_step' => $isComplete ? $totalSteps : $currentStep,
+                    'total_steps' => $totalSteps,
+                    'save_state' => $saveState,
+                    'completed_at' => $isComplete ? now() : null,
+                    'last_played_at' => now(),
+                ]
+            );
+
+            // Pre-migration completed rows have zero defaults in the new columns.
+            // Report their completion consistently without rewriting saved history.
+            $completed = $progress->status === 'completed';
+            $responseTotal = max(1, (int) ($progress->total_steps ?: $story->episodes));
+            return [
+                'success' => true,
+                'story_id' => $story->id,
+                'chapter_number' => $story->chapter_number,
+                'status' => $progress->status,
+                'progress_percent' => $completed ? 100 : $progress->progress_percent,
+                'current_step' => $completed ? $responseTotal : $progress->current_step,
+                'total_steps' => $responseTotal,
+                'save_state' => $progress->save_state,
+            ];
+        });
+    }
+
     public function completeStory(User $user, Story $story): array
     {
+        if (! $story->isUnlockedFor($user)) {
+            throw ValidationException::withMessages(['story' => 'You must unlock this chapter to complete it.']);
+        }
+
         return DB::transaction(function () use ($user, $story) {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $existing = UserStoryProgress::where('user_id', $user->id)->where('story_id', $story->id)->first();
+            $totalSteps = max(1, (int) ($existing?->total_steps ?: $story->episodes));
             $progress = UserStoryProgress::updateOrCreate(
                 [
                     'user_id' => $user->id,
@@ -118,20 +198,18 @@ class StoryService
                 ],
                 [
                     'status' => 'completed',
-                    'completed_at' => now(),
+                    'progress_percent' => 100,
+                    'current_step' => $totalSteps,
+                    'total_steps' => $totalSteps,
+                    'completed_at' => $existing?->completed_at ?? now(),
+                    'last_played_at' => now(),
                 ]
             );
 
-            // Synchronize stories_done count on user player profile
+            // Profile responses derive this count from story progress records.
             $completedCount = UserStoryProgress::where('user_id', $user->id)
                 ->where('status', 'completed')
                 ->count();
-
-            if ($user->playerProfile) {
-                $user->playerProfile->update([
-                    'stories_done' => $completedCount,
-                ]);
-            }
 
             return [
                 'success' => true,
@@ -168,11 +246,19 @@ class StoryService
         $signature = hash_hmac('sha256', $encodedPayload, $appKey);
         $ticket = $encodedPayload.'.'.$signature;
 
+        $progress = UserStoryProgress::where('user_id', $user->id)
+            ->where('story_id', $story->id)
+            ->first();
+
         return [
             'ticket' => $ticket,
             'chapter_number' => (int) $story->chapter_number,
             'story_id' => $story->id,
             'expires_at' => $payload['expires_at'],
+            'save_state' => $progress?->save_state,
+            'current_step' => $progress?->current_step ?? 0,
+            'total_steps' => $progress?->total_steps ?? 0,
+            'progress_percent' => $progress?->progress_percent ?? 0,
         ];
     }
 

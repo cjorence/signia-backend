@@ -57,6 +57,7 @@ class GoogleAuthTest extends TestCase
         ]);
 
         $user = User::where('email', 'newuser@gmail.com')->first();
+        $this->assertNotNull($user->email_verified_at);
         $this->assertNotNull($user->playerProfile);
         $this->assertEquals(1, $user->playerProfile->current_level);
     }
