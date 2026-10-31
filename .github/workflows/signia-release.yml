@@ -1,0 +1,57 @@
+name: SIGNIA checked image
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: signia-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE: ghcr.io/cjorence/signia-backend
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          path: source
+          persist-credentials: false
+      - name: Test Laravel with a temporary key and SQLite
+        working-directory: source
+        run: |
+          sudo update-alternatives --set php /usr/bin/php8.3
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg php8.3-sqlite3
+          cp .env.example .env
+          composer install --prefer-dist --no-interaction --no-progress
+          php artisan key:generate --force
+          php artisan test
+          composer audit --locked --no-dev
+      - name: Build production image
+        working-directory: source
+        run: docker build --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --label "org.opencontainers.image.revision=$GITHUB_SHA" --label "com.signia.ref=$GITHUB_REF" -t "$IMAGE:$GITHUB_SHA" .
+      - name: Publish tested revision if it is still the release branch head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head_sha() { gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha'; }
+          head=$(head_sha)
+          [[ "$head" == "$GITHUB_SHA" ]] || { echo 'Superseded release; skipping publish.'; exit 0; }
+          package=${IMAGE##*/}
+          code=$(curl --silent --show-error -o "$RUNNER_TEMP/signia-package.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/users/$GITHUB_REPOSITORY_OWNER/packages/container/$package")
+          case "$code" in
+            200) jq -e '.visibility == "private"' "$RUNNER_TEMP/signia-package.json" >/dev/null ;;
+            404) ;; # A new GHCR package starts private.
+            *) echo "Package permission check failed (HTTP $code)"; exit 1 ;;
+          esac
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          head=$(head_sha)
+          [[ "$head" == "$GITHUB_SHA" ]] || { echo 'Newer commit pending; keeping prior checked image.'; exit 0; }
+          docker tag "$IMAGE:$GITHUB_SHA" "$IMAGE:checked"
+          docker push "$IMAGE:checked"
