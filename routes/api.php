@@ -140,6 +140,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::post('/recognition/greeting-clip', [\App\Http\Controllers\Api\RecognitionController::class, 'greetingClip'])
+            ->middleware('throttle:30,1,recognition-greeting-clip');
         Route::post('/recognition/api/train/start', [\App\Http\Controllers\Api\RecognitionController::class, 'admin'])
             ->defaults('path', 'api/train/start')->middleware('throttle:2,1,recognition-train');
         Route::post('/recognition/api/train/upload_video', [\App\Http\Controllers\Api\RecognitionController::class, 'admin'])

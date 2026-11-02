@@ -28,6 +28,28 @@ class RecognitionController extends Controller
         return $this->forward('predict', 'POST', $data);
     }
 
+    public function greetingClip(Request $request)
+    {
+        if (strlen($request->getContent()) > 131072) {
+            return response()->json(['message' => 'Greeting recording too large.'], 413);
+        }
+        $frames = $request->json('frames');
+        if (! is_array($frames) || ! array_is_list($frames) || count($frames) !== 30) {
+            return response()->json(['message' => 'Expected 30 greeting samples.'], 422);
+        }
+        foreach ($frames as $frame) {
+            if (! is_array($frame) || ! array_is_list($frame) || count($frame) !== 126) {
+                return response()->json(['message' => 'Invalid greeting sample.'], 422);
+            }
+            foreach ($frame as $value) {
+                if ((! is_int($value) && ! is_float($value)) || ! is_finite($value) || abs($value) > 4) {
+                    return response()->json(['message' => 'Invalid hand landmarks.'], 422);
+                }
+            }
+        }
+        return $this->forward('predict/greeting-clip', 'POST', ['frames' => $frames]);
+    }
+
     public function admin(Request $request, string $path)
     {
         $get = in_array($path, ['api/train/capabilities', 'api/train/labels', 'api/train/stats', 'models', 'modes'], true)
@@ -108,6 +130,9 @@ class RecognitionController extends Controller
             return response()->json(['message' => 'Invalid recognition service response.'], 502);
         }
 
+        if ($path === 'models' && $upstream->successful()) {
+            $payload['admin_greeting_clip'] = ($payload['greeting_clip'] ?? false) === true;
+        }
         if ($path === 'api/train/capabilities' && $upstream->successful()) {
             $payload['training_enabled'] = config('recognition.training_enabled') === true
                 && ($payload['training_enabled'] ?? false) === true;

@@ -49,6 +49,25 @@ class RecognitionSecurityTest extends TestCase
         $this->assertNotSame($streams[0], $streams[1]);
     }
 
+    public function test_greeting_clip_is_admin_only_and_forwards_one_validated_attempt(): void
+    {
+        config(['recognition.url' => 'http://recognition.internal', 'recognition.token' => str_repeat('s', 40)]);
+        Http::fake(['recognition.internal/*' => Http::response(['prediction' => 'Hello', 'confidence' => .91])]);
+        $route = '/api/admin/recognition/greeting-clip';
+        $clip = ['frames' => array_fill(0, 30, array_fill(0, 126, .12))];
+        $this->postJson($route, $clip)->assertUnauthorized();
+        $this->actingAs(User::factory()->create(['role' => 'user', 'is_active' => true]))->postJson($route, $clip)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'is_active' => true]));
+        $this->postJson($route, ['frames' => []])->assertStatus(422);
+        $bad = $clip;
+        $bad['frames'][29][125] = 'invalid';
+        $this->postJson($route, $bad)->assertStatus(422);
+        Http::assertNothingSent();
+        $this->postJson($route, $clip + ['mode' => 'other'])->assertOk()->assertJsonPath('prediction', 'Hello');
+        Http::assertSent(fn ($request) => $request->url() === 'http://recognition.internal/predict/greeting-clip'
+            && $request->data() === $clip && $request->hasHeader('Authorization', 'Bearer '.str_repeat('s', 40)));
+    }
+
     public function test_invalid_images_are_rejected_before_contacting_python(): void
     {
         Http::fake();
