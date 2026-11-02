@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      IMAGE: ghcr.io/cjorence/signia-backend
+      IMAGE: ghcr.io/cjorence/signia-backend-release
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -43,13 +43,25 @@ jobs:
           head=$(head_sha)
           [[ "$head" == "$GITHUB_SHA" ]] || { echo 'Superseded release; skipping publish.'; exit 0; }
           package=${IMAGE##*/}
-          code=$(curl --silent --show-error -o "$RUNNER_TEMP/signia-package.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/users/$GITHUB_REPOSITORY_OWNER/packages/container/$package")
-          case "$code" in
-            200) jq -e '.visibility == "private"' "$RUNNER_TEMP/signia-package.json" >/dev/null ;;
-            404) ;; # A new GHCR package starts private.
-            *) echo "Package permission check failed (HTTP $code)"; exit 1 ;;
-          esac
+          inspect_package() {
+            curl --silent --show-error --retry 2 -o "$RUNNER_TEMP/signia-package.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/users/$GITHUB_REPOSITORY_OWNER/packages/container/$package"
+          }
+          code=$(inspect_package)
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          if [[ "$code" == 404 ]]; then
+            # Establish visibility using an empty image before publishing any application layers.
+            printf 'FROM scratch\nLABEL com.signia.bootstrap=true\n' | docker build --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t "$IMAGE:visibility-check" -
+            docker push "$IMAGE:visibility-check"
+            for attempt in {1..12}; do
+              code=$(inspect_package)
+              [[ "$code" != 404 ]] && break
+              sleep 5
+            done
+          fi
+          [[ "$code" == 200 ]] || { echo "Package metadata unavailable (HTTP $code); application image withheld."; exit 1; }
+          visibility=$(jq -r '.visibility' "$RUNNER_TEMP/signia-package.json")
+          [[ "$visibility" == private ]] || { echo "Package visibility is $visibility; application image withheld."; exit 1; }
+          echo 'Private backend release package verified.'
           docker push "$IMAGE:$GITHUB_SHA"
           head=$(head_sha)
           [[ "$head" == "$GITHUB_SHA" ]] || { echo 'Newer commit pending; keeping prior checked image.'; exit 0; }
