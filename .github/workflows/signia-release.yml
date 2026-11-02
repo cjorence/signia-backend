@@ -47,21 +47,24 @@ jobs:
             curl --silent --show-error --retry 2 -o "$RUNNER_TEMP/signia-package.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/users/$GITHUB_REPOSITORY_OWNER/packages/container/$package"
           }
           code=$(inspect_package)
+          case "$code" in
+            200) jq -e '.visibility == "private"' "$RUNNER_TEMP/signia-package.json" >/dev/null || { echo 'Package is public; application image withheld.'; exit 1; } ;;
+            404) ;; # GitHub's named-user metadata endpoint describes public packages.
+            *) echo "Package metadata check failed (HTTP $code)"; exit 1 ;;
+          esac
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          if [[ "$code" == 404 ]]; then
-            # Establish visibility using an empty image before publishing any application layers.
-            printf 'FROM scratch\nLABEL com.signia.bootstrap=true\n' | docker build --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t "$IMAGE:visibility-check" -
-            docker push "$IMAGE:visibility-check"
-            for attempt in {1..12}; do
-              code=$(inspect_package)
-              [[ "$code" != 404 ]] && break
-              sleep 5
-            done
+          printf 'FROM scratch\nLABEL com.signia.bootstrap=true\n' | docker build --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t "$IMAGE:visibility-check" -
+          docker push "$IMAGE:visibility-check"
+          docker manifest inspect "$IMAGE:visibility-check" >/dev/null
+          # Confirm anonymous access to the same existing tag is denied. A 404,
+          # connectivity error or missing manifest does not establish privacy.
+          path=${IMAGE#ghcr.io/}
+          anon=$(curl -sS --retry 2 -o "$RUNNER_TEMP/signia-anon.json" -w '%{http_code}' "https://ghcr.io/token?scope=repository:$path:pull&service=ghcr.io")
+          if [[ "$anon" == 200 ]]; then
+            bearer=$(jq -er '.token' "$RUNNER_TEMP/signia-anon.json")
+            anon=$(curl -sS --head --retry 2 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $bearer" -H 'Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' "https://ghcr.io/v2/$path/manifests/visibility-check")
           fi
-          [[ "$code" == 200 ]] || { echo "Package metadata unavailable (HTTP $code); application image withheld."; exit 1; }
-          visibility=$(jq -r '.visibility' "$RUNNER_TEMP/signia-package.json")
-          [[ "$visibility" == private ]] || { echo "Package visibility is $visibility; application image withheld."; exit 1; }
-          echo 'Private backend release package verified.'
+          case "$anon" in 401|403) echo 'Authenticated pull passed and anonymous pull denied.' ;; *) echo "Unexpected anonymous access (HTTP $anon); application image withheld."; exit 1 ;; esac
           docker push "$IMAGE:$GITHUB_SHA"
           head=$(head_sha)
           [[ "$head" == "$GITHUB_SHA" ]] || { echo 'Newer commit pending; keeping prior checked image.'; exit 0; }
