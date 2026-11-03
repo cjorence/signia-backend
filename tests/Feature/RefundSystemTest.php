@@ -95,7 +95,7 @@ class RefundSystemTest extends TestCase
             return $mail->hasTo($user->email);
         });
 
-        Mail::assertSent(RefundRequestAdminAlertMail::class);
+        Mail::assertSent(RefundRequestAdminAlertMail::class, fn ($mail) => $mail->hasTo('signiafsl@gmail.com'));
     }
 
     public function test_user_cannot_request_refund_for_unpaid_or_other_users_purchase(): void

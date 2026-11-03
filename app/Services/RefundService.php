@@ -80,12 +80,8 @@ class RefundService
             Log::warning('Refund confirmation email failed', ['user_id' => $user->id, 'exception_type' => get_class($e)]);
         }
 
-        // Send alert to Dedicated System / Admin Support Email
         try {
-            $adminEmail = config('mail.admin_support_address') ?: config('mail.from.address');
-            if (! empty($adminEmail)) {
-                Mail::to($adminEmail)->send(new RefundRequestAdminAlertMail($refundRequest));
-            }
+            Mail::to(config('mail.support_address'))->send(new RefundRequestAdminAlertMail($refundRequest));
         } catch (\Throwable $e) {
             Log::warning('Refund admin alert failed', ['exception_type' => get_class($e)]);
         }
