@@ -197,8 +197,7 @@ class AuthController extends Controller
 
         $user = $result['user'] ?? null;
         if ($user && $user->role === 'admin') {
-            $ip = $request->ip() ?: 'Unknown IP';
-            app(\App\Services\AdminService::class)->logAction($user, "Successful admin session login from IP {$ip}");
+            app(\App\Services\AdminService::class)->logAction($user, 'Signed in to the admin account');
         }
 
         return response()->json([
@@ -550,8 +549,7 @@ class AuthController extends Controller
 
         $user = $result['user'] ?? null;
         if ($user && $user->role === 'admin') {
-            $ip = $request->ip() ?: 'Unknown IP';
-            app(\App\Services\AdminService::class)->logAction($user, "Successful admin session login from IP {$ip}");
+            app(\App\Services\AdminService::class)->logAction($user, 'Signed in to the admin account');
         }
 
         return response()->json([

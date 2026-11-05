@@ -67,7 +67,11 @@ class RecognitionController extends Controller
         }
         if ($request->isMethod('post') && $path === 'api/train/start') {
             $data = $request->validate(['category' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_ -]+$/']]);
-            return $this->forward($path, 'POST', $data);
+            $response = $this->forward($path, 'POST', $data);
+            if ($response->isSuccessful() && ($response->getData(true)['status'] ?? '') !== 'error' && ($response->getData(true)['success'] ?? true) !== false) {
+                app(\App\Services\AdminService::class)->logAction($request->user(), 'Started model training for '.$data['category']);
+            }
+            return $response;
         }
         if ($request->isMethod('post') && $path === 'api/train/upload_video') {
             $data = $request->validate([
@@ -76,7 +80,11 @@ class RecognitionController extends Controller
                 'video' => ['required', 'file', 'mimes:mp4,mov,webm,mkv,avi', 'max:20480'],
             ]);
             unset($data['video']);
-            return $this->forward($path, 'POST', $data, $request->file('video'));
+            $response = $this->forward($path, 'POST', $data, $request->file('video'));
+            if ($response->isSuccessful() && ($response->getData(true)['status'] ?? '') !== 'error' && ($response->getData(true)['success'] ?? true) !== false) {
+                app(\App\Services\AdminService::class)->logAction($request->user(), 'Uploaded training video for '.$data['category']);
+            }
+            return $response;
         }
         abort(404);
     }

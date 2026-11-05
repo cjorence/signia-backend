@@ -376,14 +376,18 @@ class AdminService
     {
         return AdminLog::with('admin')
             ->orderBy('created_at', 'desc')
+            ->orderByDesc('id')
             ->get();
     }
 
     public function logAction(User $admin, string $action): AdminLog
     {
+        $ip = request()->ip();
         return AdminLog::create([
             'admin_id' => $admin->id,
-            'action' => $action,
+            'admin_name' => $admin->name,
+            'ip_address' => filter_var($ip, FILTER_VALIDATE_IP) ?: null,
+            'action' => \Illuminate\Support\Str::limit($action, 255, ''),
         ]);
     }
 }

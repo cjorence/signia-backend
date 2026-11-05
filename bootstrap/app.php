@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'audit' => \App\Http\Middleware\AuditAdminChange::class,
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
     })

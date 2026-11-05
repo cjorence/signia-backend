@@ -50,10 +50,6 @@ class QuizController extends Controller
     {
         $quiz = $this->quizService->createQuiz($request->validated());
 
-        if ($admin = Auth::user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Created quiz '{$quiz->title}'");
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Quiz created successfully.',
@@ -65,10 +61,6 @@ class QuizController extends Controller
     {
         $quiz = $this->quizService->updateQuiz($quiz, $request->validated());
 
-        if ($admin = Auth::user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Updated quiz '{$quiz->title}'");
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Quiz updated successfully.',
@@ -78,12 +70,7 @@ class QuizController extends Controller
 
     public function destroy(Quiz $quiz): JsonResponse
     {
-        $title = $quiz->title;
         $this->quizService->deleteQuiz($quiz);
-
-        if ($admin = Auth::user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Deleted quiz '{$title}'");
-        }
 
         return response()->json([
             'success' => true,
