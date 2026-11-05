@@ -5,13 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Story;
 use App\Services\CurriculumEventService;
-use App\Services\StoryLessonService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Rule;
 
 class AdminStoryController extends Controller
 {
@@ -22,12 +20,6 @@ class AdminStoryController extends Controller
             ->orderBy('chapter_number')
             ->get();
 
-        $lessonService = app(StoryLessonService::class);
-        $levels = $lessonService->levels();
-        foreach ($stories as $story) {
-            $story->recommended_level_ids = $lessonService->idsFor($story, $levels);
-        }
-
         return response()->json([
             'success' => true,
             'data' => $stories,
@@ -36,7 +28,6 @@ class AdminStoryController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $this->validateRecommendations($request);
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -111,7 +102,6 @@ class AdminStoryController extends Controller
             'cover_url' => $coverUrl,
             'file_name' => $fileName,
             'required_lesson_ids' => $requiredLessons ?? [],
-            'recommended_level_ids' => $request->input('recommended_level_ids'),
         ]);
 
         CurriculumEventService::record('story-added', $story->id, $story->title);
@@ -139,7 +129,6 @@ class AdminStoryController extends Controller
 
     public function update(Request $request, Story $story): JsonResponse
     {
-        $this->validateRecommendations($request);
         $validated = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -155,10 +144,6 @@ class AdminStoryController extends Controller
             'cover_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'package_file' => ['nullable', 'file', 'max:102400'],
         ]);
-
-        if ($request->exists('recommended_level_ids')) {
-            $story->recommended_level_ids = $request->input('recommended_level_ids');
-        }
 
         if (isset($validated['title'])) {
             $story->title = $validated['title'];
@@ -412,25 +397,6 @@ class AdminStoryController extends Controller
             'success' => true,
             'message' => 'Story chapter permanently deleted.',
         ], 200);
-    }
-
-    private function validateRecommendations(Request $request): void
-    {
-        if (is_string($request->input('recommended_level_ids'))) {
-            $decoded = json_decode($request->input('recommended_level_ids'), true);
-            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded) || ! array_is_list($decoded)) {
-                throw ValidationException::withMessages(['recommended_level_ids' => 'Choose lesson groups from the list.']);
-            }
-            $request->merge(['recommended_level_ids' => $decoded]);
-        }
-
-        $request->validate([
-            'recommended_level_ids' => ['sometimes', 'nullable', 'array', 'list', 'max:50'],
-            'recommended_level_ids.*' => ['required', 'integer', 'distinct', Rule::exists('levels', 'id')->whereNull('deleted_at')],
-        ], [
-            'recommended_level_ids.*.exists' => 'One of the selected lesson groups is no longer available. Please choose another.',
-            'recommended_level_ids.*.integer' => 'Choose lesson groups from the list.',
-        ]);
     }
 
     public function bulkForceDestroy(Request $request): JsonResponse

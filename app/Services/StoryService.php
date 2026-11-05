@@ -16,9 +16,6 @@ class StoryService
     public function getStoriesForUser(?User $user): Collection
     {
         $stories = Story::orderBy('chapter_number')->orderBy('order')->get();
-        $lessonService = app(StoryLessonService::class);
-        $levels = $lessonService->levels();
-        $completedSigns = $lessonService->completedSigns($user);
 
         $unlockedStoryIds = [];
         $completedStoryIds = [];
@@ -38,7 +35,7 @@ class StoryService
             }
         }
 
-        return $stories->map(function (Story $story) use ($user, $unlockedStoryIds, $completedStoryIds, $userProgressByStory, $lessonService, $levels, $completedSigns) {
+        return $stories->map(function (Story $story) use ($user, $unlockedStoryIds, $completedStoryIds, $userProgressByStory) {
             $isFree = (bool) $story->is_free || $story->chapter_number === 1;
             $isAdmin = $user && $user->role === 'admin';
             $isUnlocked = $isFree || $isAdmin || in_array($story->id, $unlockedStoryIds, true);
@@ -80,7 +77,6 @@ class StoryService
                 'cover_url' => $story->cover_url,
                 'file_name' => $story->file_name,
                 'required_lesson_ids' => $story->required_lesson_ids ?? [],
-                'recommended_lessons' => $lessonService->forStory($story, $levels, $completedSigns),
                 'is_unlocked' => $isUnlocked,
                 'is_completed' => $isCompleted,
                 'status' => $status,

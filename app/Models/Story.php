@@ -26,8 +26,10 @@ class Story extends Model
         'cover_url',
         'file_name',
         'required_lesson_ids',
-        'recommended_level_ids',
     ];
+
+    // Older installations may have stored lesson suggestions. Keep those private.
+    protected $hidden = ['recommended_level_ids'];
 
     protected $casts = [
         'chapter_number' => 'integer',
@@ -36,7 +38,6 @@ class Story extends Model
         'price' => 'decimal:2',
         'episodes' => 'integer',
         'required_lesson_ids' => 'array',
-        'recommended_level_ids' => 'array',
     ];
 
     public function unlocks(): HasMany
