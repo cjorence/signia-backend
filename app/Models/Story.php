@@ -28,6 +28,9 @@ class Story extends Model
         'required_lesson_ids',
     ];
 
+    // Older installations may have stored lesson suggestions. Keep those private.
+    protected $hidden = ['recommended_level_ids'];
+
     protected $casts = [
         'chapter_number' => 'integer',
         'order' => 'integer',

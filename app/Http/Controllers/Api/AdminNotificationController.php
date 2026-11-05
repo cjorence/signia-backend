@@ -88,11 +88,12 @@ class AdminNotificationController extends Controller
 
     public function clearAll(): JsonResponse
     {
-        $this->notificationService->clearAll();
+        $count = $this->notificationService->clearAll();
 
         return response()->json([
             'success' => true,
             'message' => 'All admin notifications cleared.',
+            'cleared_count' => $count,
             'unread_count' => 0,
         ], 200);
     }

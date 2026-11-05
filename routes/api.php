@@ -151,47 +151,47 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
         // Levels
         Route::get('/levels/archived', [LevelController::class, 'archived']);
-        Route::post('/levels/reorder', [LevelController::class, 'reorder']);
-        Route::post('/levels/{level}/archive', [LevelController::class, 'archive']);
-        Route::post('/levels/{id}/restore', [LevelController::class, 'restore']);
-        Route::delete('/levels/{id}/force', [LevelController::class, 'forceDestroy']);
-        Route::post('/levels', [LevelController::class, 'store']);
-        Route::put('/levels/{level}', [LevelController::class, 'update']);
-        Route::delete('/levels/{level}', [LevelController::class, 'destroy']);
+        Route::post('/levels/reorder', [LevelController::class, 'reorder'])->middleware('audit:Reordered categories');
+        Route::post('/levels/{level}/archive', [LevelController::class, 'archive'])->middleware('audit:Archived category');
+        Route::post('/levels/{id}/restore', [LevelController::class, 'restore'])->middleware('audit:Restored category');
+        Route::delete('/levels/{id}/force', [LevelController::class, 'forceDestroy'])->middleware('audit:Permanently deleted category');
+        Route::post('/levels', [LevelController::class, 'store'])->middleware('audit:Created category');
+        Route::put('/levels/{level}', [LevelController::class, 'update'])->middleware('audit:Updated category');
+        Route::delete('/levels/{level}', [LevelController::class, 'destroy'])->middleware('audit:Deleted category');
 
         // Signs
         Route::get('/signs/archived', [SignController::class, 'archived']);
-        Route::post('/signs/reorder', [SignController::class, 'reorder']);
-        Route::post('/signs/bulk-archive', [SignController::class, 'bulkArchive']);
-        Route::post('/signs/bulk-restore', [SignController::class, 'bulkRestore']);
-        Route::post('/signs/bulk-force-delete', [SignController::class, 'bulkForceDestroy']);
+        Route::post('/signs/reorder', [SignController::class, 'reorder'])->middleware('audit:Reordered lessons');
+        Route::post('/signs/bulk-archive', [SignController::class, 'bulkArchive'])->middleware('audit:Archived lesson');
+        Route::post('/signs/bulk-restore', [SignController::class, 'bulkRestore'])->middleware('audit:Restored lesson');
+        Route::post('/signs/bulk-force-delete', [SignController::class, 'bulkForceDestroy'])->middleware('audit:Permanently deleted lesson');
         Route::post('/signs/convert-video', [SignController::class, 'convertVideo'])->middleware('throttle:10,1,video-convert');
-        Route::post('/signs/{sign}/archive', [SignController::class, 'archive']);
-        Route::post('/signs/{id}/restore', [SignController::class, 'restore']);
-        Route::delete('/signs/{id}/force', [SignController::class, 'forceDestroy']);
-        Route::post('/signs', [SignController::class, 'store']);
-        Route::put('/signs/{sign}', [SignController::class, 'update']);
-        Route::delete('/signs/{sign}', [SignController::class, 'destroy']);
+        Route::post('/signs/{sign}/archive', [SignController::class, 'archive'])->middleware('audit:Archived lesson');
+        Route::post('/signs/{id}/restore', [SignController::class, 'restore'])->middleware('audit:Restored lesson');
+        Route::delete('/signs/{id}/force', [SignController::class, 'forceDestroy'])->middleware('audit:Permanently deleted lesson');
+        Route::post('/signs', [SignController::class, 'store'])->middleware('audit:Created lesson');
+        Route::put('/signs/{sign}', [SignController::class, 'update'])->middleware('audit:Updated lesson');
+        Route::delete('/signs/{sign}', [SignController::class, 'destroy'])->middleware('audit:Deleted lesson');
 
         // Quests
-        Route::post('/quests', [QuestController::class, 'store']);
-        Route::put('/quests/{quest}', [QuestController::class, 'update']);
-        Route::delete('/quests/{quest}', [QuestController::class, 'destroy']);
+        Route::post('/quests', [QuestController::class, 'store'])->middleware('audit:Created quest');
+        Route::put('/quests/{quest}', [QuestController::class, 'update'])->middleware('audit:Updated quest');
+        Route::delete('/quests/{quest}', [QuestController::class, 'destroy'])->middleware('audit:Deleted quest');
 
         // Quizzes
-        Route::post('/quizzes', [QuizController::class, 'store']);
-        Route::put('/quizzes/{quiz}', [QuizController::class, 'update']);
-        Route::delete('/quizzes/{quiz}', [QuizController::class, 'destroy']);
+        Route::post('/quizzes', [QuizController::class, 'store'])->middleware('audit:Created quiz');
+        Route::put('/quizzes/{quiz}', [QuizController::class, 'update'])->middleware('audit:Updated quiz');
+        Route::delete('/quizzes/{quiz}', [QuizController::class, 'destroy'])->middleware('audit:Deleted quiz');
 
         // Quiz questions
-        Route::post('/quizzes/{quiz}/questions', [QuizController::class, 'addQuestion']);
-        Route::put('/questions/{question}', [QuizController::class, 'updateQuestion']);
-        Route::delete('/questions/{question}', [QuizController::class, 'deleteQuestion']);
+        Route::post('/quizzes/{quiz}/questions', [QuizController::class, 'addQuestion'])->middleware('audit:Added quiz question');
+        Route::put('/questions/{question}', [QuizController::class, 'updateQuestion'])->middleware('audit:Updated quiz question');
+        Route::delete('/questions/{question}', [QuizController::class, 'deleteQuestion'])->middleware('audit:Deleted quiz question');
 
         // Question choices
-        Route::post('/questions/{question}/choices', [QuizController::class, 'addChoice']);
-        Route::put('/choices/{choice}', [QuizController::class, 'updateChoice']);
-        Route::delete('/choices/{choice}', [QuizController::class, 'deleteChoice']);
+        Route::post('/questions/{question}/choices', [QuizController::class, 'addChoice'])->middleware('audit:Added answer choice');
+        Route::put('/choices/{choice}', [QuizController::class, 'updateChoice'])->middleware('audit:Updated answer choice');
+        Route::delete('/choices/{choice}', [QuizController::class, 'deleteChoice'])->middleware('audit:Deleted answer choice');
 
         // Admin dashboard
         Route::get('/analytics', [AdminController::class, 'analytics']);
@@ -206,7 +206,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
         Route::get('/purchases', [PurchaseController::class, 'adminPurchases']);
         Route::get('/revenue/summary', [PurchaseController::class, 'revenueSummary']);
-        Route::post('/purchases/{purchase}/mark-paid', [PurchaseController::class, 'markPaid']);
+        Route::post('/purchases/{purchase}/mark-paid', [PurchaseController::class, 'markPaid'])->middleware('audit:Confirmed payment for purchase');
 
         Route::get('/heart-transactions', [HeartController::class, 'adminTransactions']);
         Route::post('/hearts/grant-bulk', [HeartController::class, 'grantBulk']);
@@ -219,27 +219,27 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
         // Story Chapters (Admin Dynamic Story Management)
         Route::get('/stories/archived', [AdminStoryController::class, 'archived']);
-        Route::post('/stories/bulk-archive', [AdminStoryController::class, 'bulkArchive']);
-        Route::post('/stories/bulk-restore', [AdminStoryController::class, 'bulkRestore']);
-        Route::post('/stories/bulk-force-delete', [AdminStoryController::class, 'bulkForceDestroy']);
-        Route::post('/stories/{story}/archive', [AdminStoryController::class, 'archive']);
-        Route::post('/stories/{id}/restore', [AdminStoryController::class, 'restore']);
-        Route::delete('/stories/{id}/force', [AdminStoryController::class, 'forceDestroy']);
+        Route::post('/stories/bulk-archive', [AdminStoryController::class, 'bulkArchive'])->middleware('audit:Archived story chapter');
+        Route::post('/stories/bulk-restore', [AdminStoryController::class, 'bulkRestore'])->middleware('audit:Restored story chapter');
+        Route::post('/stories/bulk-force-delete', [AdminStoryController::class, 'bulkForceDestroy'])->middleware('audit:Permanently deleted story chapter');
+        Route::post('/stories/{story}/archive', [AdminStoryController::class, 'archive'])->middleware('audit:Archived story chapter');
+        Route::post('/stories/{id}/restore', [AdminStoryController::class, 'restore'])->middleware('audit:Restored story chapter');
+        Route::delete('/stories/{id}/force', [AdminStoryController::class, 'forceDestroy'])->middleware('audit:Permanently deleted story chapter');
         Route::get('/stories', [AdminStoryController::class, 'index']);
-        Route::post('/stories', [AdminStoryController::class, 'store']);
+        Route::post('/stories', [AdminStoryController::class, 'store'])->middleware('audit:Created story chapter');
         Route::get('/stories/{story}', [AdminStoryController::class, 'show']);
-        Route::post('/stories/{story}', [AdminStoryController::class, 'update']);
-        Route::put('/stories/{story}', [AdminStoryController::class, 'update']);
-        Route::delete('/stories/{story}', [AdminStoryController::class, 'destroy']);
+        Route::post('/stories/{story}', [AdminStoryController::class, 'update'])->middleware('audit:Updated story chapter');
+        Route::put('/stories/{story}', [AdminStoryController::class, 'update'])->middleware('audit:Updated story chapter');
+        Route::delete('/stories/{story}', [AdminStoryController::class, 'destroy'])->middleware('audit:Archived story chapter');
 
         // Admin Notifications & Preferences
         Route::get('/notifications/settings', [AdminNotificationController::class, 'settings']);
-        Route::match(['put', 'patch', 'post'], '/notifications/settings', [AdminNotificationController::class, 'updateSettings']);
+        Route::match(['put', 'patch', 'post'], '/notifications/settings', [AdminNotificationController::class, 'updateSettings'])->middleware('audit:Saved notification settings');
         Route::get('/notifications', [AdminNotificationController::class, 'index']);
-        Route::post('/notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
-        Route::post('/notifications/read-all', [AdminNotificationController::class, 'markAllRead']);
-        Route::delete('/notifications/{id}', [AdminNotificationController::class, 'destroy']);
-        Route::post('/notifications/clear-all', [AdminNotificationController::class, 'clearAll']);
+        Route::post('/notifications/{id}/read', [AdminNotificationController::class, 'markRead'])->middleware('audit:Marked notification as read');
+        Route::post('/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->middleware('audit:Marked all notifications as read');
+        Route::delete('/notifications/{id}', [AdminNotificationController::class, 'destroy'])->middleware('audit:Deleted notification');
+        Route::post('/notifications/clear-all', [AdminNotificationController::class, 'clearAll'])->middleware('audit:Cleared notifications');
         Route::post('/notifications/training-completed', [AdminNotificationController::class, 'reportTrainingComplete']);
     });
 });

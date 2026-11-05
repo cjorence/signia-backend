@@ -12,6 +12,8 @@ class AdminLog extends Model
 
     protected $fillable = [
         'admin_id',
+        'admin_name',
+        'ip_address',
         'action',
     ];
 

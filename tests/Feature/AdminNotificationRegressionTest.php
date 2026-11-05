@@ -95,9 +95,24 @@ class AdminNotificationRegressionTest extends TestCase
             ]);
             $notification = app(AdminNotificationService::class)->notifyHeartPurchase($purchase, $user);
             $this->assertStringContainsString($currency.' 49.00', $notification->message);
+            $this->assertStringContainsString('Small Hearts Pack', $notification->message);
             $this->assertSame($currency, $notification->data['currency']);
             $this->assertSame('49.00', $purchase->fresh()->amount);
         }
+    }
+
+    public function test_existing_purchase_alerts_are_readable_without_rewriting_history(): void
+    {
+        $notification = AdminNotification::create([
+            'type' => 'heart_purchase', 'title' => 'Hearts Store Purchase',
+            'message' => 'PENGUIN purchased small_hearts for PHP 49.00.',
+            'data' => ['package_key' => 'small_hearts'], 'severity' => 'success',
+        ]);
+        $result = app(AdminNotificationService::class)->getNotifications();
+        $this->assertSame('PENGUIN purchased Small Hearts Pack for PHP 49.00.', $result['notifications'][0]->message);
+        $this->assertSame('small_hearts', $result['notifications'][0]->data['package_key']);
+        $this->assertSame(1, $result['unread_count']);
+        $this->assertStringContainsString('small_hearts', $notification->fresh()->message);
     }
 
     public function test_receipt_is_rolled_back_if_notification_insert_fails(): void

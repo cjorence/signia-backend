@@ -145,7 +145,9 @@ class AdminController extends Controller
                 $this->adminService->logAction($admin, 'Updated active maintenance message');
             }
         }
-        // If !wasEnabled && !enabled: NOTHING is recorded. Zero spam to learners!
+        if (!$enabled && !$wasEnabled && $message !== $previousMessage && $admin) {
+            $this->adminService->logAction($admin, 'Saved maintenance notice for later');
+        }
 
         return response()->json([
             'success' => true,

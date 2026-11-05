@@ -12,6 +12,18 @@ class PlayerNotificationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_broadcast_does_not_expose_internal_reason_but_personal_notes_remain(): void
+    {
+        $user = User::factory()->create();
+        CurriculumEventService::record('platform-maintenance', 1, 'We are updating lessons.', 'active');
+        HeartTransaction::create(['user_id' => $user->id, 'type' => 'admin_grant', 'amount' => 5, 'reason' => 'Community reward']);
+        $items = $this->actingAs($user, 'sanctum')->getJson('/api/user/notifications')->assertOk()->json('data');
+        $notice = collect($items)->firstWhere('category', 'curriculum');
+        $personal = collect($items)->firstWhere('category', 'personal');
+        $this->assertNull($notice['reason']);
+        $this->assertSame('Community reward', $personal['reason']);
+    }
+
     public function test_player_can_fetch_and_manage_notifications()
     {
         $user = User::factory()->create();

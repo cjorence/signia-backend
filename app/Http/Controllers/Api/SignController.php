@@ -54,10 +54,6 @@ class SignController extends Controller
         $sign = $this->signService->createSign($request->validated());
         \App\Services\CurriculumEventService::record('lesson-added', $sign->id, $sign->name);
 
-        if ($admin = auth()->user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Created new sign '{$sign->name}'");
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Sign created successfully.',
@@ -69,10 +65,6 @@ class SignController extends Controller
     {
         $sign = $this->signService->updateSign($sign, $request->validated());
 
-        if ($admin = auth()->user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Updated sign '{$sign->name}'");
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Sign updated successfully.',
@@ -82,12 +74,7 @@ class SignController extends Controller
 
     public function destroy(Sign $sign): JsonResponse
     {
-        $name = $sign->name;
         $this->signService->deleteSign($sign);
-
-        if ($admin = auth()->user()) {
-            app(\App\Services\AdminService::class)->logAction($admin, "Deleted sign '{$name}'");
-        }
 
         return response()->json([
             'success' => true,

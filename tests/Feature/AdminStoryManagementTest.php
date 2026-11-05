@@ -35,6 +35,24 @@ class AdminStoryManagementTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_retired_lesson_suggestions_are_private_and_old_editors_can_still_save(): void
+    {
+        $story = Story::create(['slug' => 'arrival', 'title' => 'Arrival', 'chapter_number' => 1]);
+        $saved = json_encode([7, 8]);
+        \Illuminate\Support\Facades\DB::table('stories')->where('id', $story->id)
+            ->update(['recommended_level_ids' => $saved]);
+
+        $this->actingAs($this->admin)->getJson('/api/admin/stories')
+            ->assertOk()->assertJsonMissingPath('data.0.recommended_level_ids');
+        $this->postJson('/api/admin/stories/'.$story->id, [
+            'title' => 'New arrival', 'recommended_level_ids' => '[]',
+        ])->assertOk()->assertJsonPath('data.title', 'New arrival')
+            ->assertJsonMissingPath('data.recommended_level_ids');
+        $this->assertSame([7, 8], json_decode($story->fresh()->getRawOriginal('recommended_level_ids'), true));
+        $this->actingAs($this->player)->getJson('/api/stories')
+            ->assertOk()->assertJsonMissingPath('data.0.recommended_lessons');
+    }
+
     public function test_admin_can_list_stories(): void
     {
         Story::create([
