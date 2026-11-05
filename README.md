@@ -1,63 +1,39 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIGNIA Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+SIGNIA helps learners practice Filipino Sign Language (FSL). This Laravel 12 API serves the Nuxt frontend, manages accounts, lessons, quizzes and story progress, and forwards sign recognition requests to the private Python service.
 
-## Updating SIGNIA
+## Run the API locally
 
-See [Updating an existing checkout](docs/pull-update.md) for the current Composer install, cache refresh, migration, and local server commands. The new admin notification feature requires `php artisan migrate` after pulling.
+For a **new checkout**, start with PHP 8.3, Composer 2 and a running MySQL server. From the backend repository, run the following in PowerShell.
 
-## About Laravel
+```powershell
+Copy-Item .env.example .env
+composer install
+php artisan key:generate
+```
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Create an empty local MySQL database and set the `DB_*` values in `.env` to match it. The example uses `signia_db` on port `3307`. Then create the tables and start the API.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```powershell
+php artisan migrate
+php artisan serve
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Open [the local health check](http://127.0.0.1:8000/up) to verify that Laravel has started. On Windows, `.\dev-local.cmd` also starts the API with PHP OPcache enabled.
 
-## Learning Laravel
+For the learner interface, start the separate `signia-frontend` project. For camera recognition, also start `signia-fsl-recognition`. The API uses `RECOGNITION_SERVICE_URL` to reach Python (locally, `http://127.0.0.1:5000`). If you set `FSL_SERVICE_TOKEN`, use the same value in both services.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Update and test
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+For an **existing checkout**, keep your current `.env` and application key. Follow the [update guide](docs/pull-update.md) for the order of dependency installation, cache clearing and migrations, including the admin notification migration.
 
-## Laravel Sponsors
+Run `php artisan test` for the backend suite. The tests use in-memory SQLite and require the PHP SQLite driver. The release workflow also installs FFmpeg for media tests.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Deployment
 
-### Premium Partners
+SIGNIA runs on DigitalOcean with Docker Compose. On `main`, the [release workflow](.github/workflows/signia-release.yml) tests the API, builds the [backend image](Dockerfile) and publishes it to GitHub Container Registry. The backend container expects its persistent media volume at `/data`. The [startup script](deploy/start.sh) checks `RAILWAY_VOLUME_MOUNT_PATH=/data`, a legacy variable still supplied by the DigitalOcean configuration.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- [Deployment security](docs/security-deployment.md)
+- [Production diagnostics](docs/production-diagnostics.md)
+- [Recognition training settings](docs/training-mode.md)
+- [Local camera performance](docs/local-camera-performance.md)
