@@ -26,6 +26,7 @@ class Story extends Model
         'cover_url',
         'file_name',
         'required_lesson_ids',
+        'recommended_level_ids',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Story extends Model
         'price' => 'decimal:2',
         'episodes' => 'integer',
         'required_lesson_ids' => 'array',
+        'recommended_level_ids' => 'array',
     ];
 
     public function unlocks(): HasMany

@@ -137,21 +137,21 @@ class PlayerNotificationController extends Controller
                 'story-archived' => 'Story Chapter Archived',
                 'story-restored' => 'Story Chapter Restored',
                 'story-added' => 'New Story Chapter Available',
-                'platform-maintenance' => (($event['id'] ?? 0) === 1 ? 'Platform Maintenance Notice' : 'System Operational'),
+                'platform-maintenance' => (($event['id'] ?? 0) === 1 ? 'Platform Maintenance Notice' : 'Ready to learn again'),
                 default => 'Curriculum Notice',
             };
 
             $message = match ($type) {
-                'lesson-archived' => "The lesson \"{$name}\" was archived by an administrator.",
+                'lesson-archived' => "The lesson \"{$name}\" is currently unavailable. Your saved progress is safe.",
                 'lesson-restored' => "The lesson \"{$name}\" has been restored and is ready to practice!",
                 'lesson-added' => "A new lesson \"{$name}\" is now available to learn and practice!",
-                'category-archived' => "The category \"{$name}\" was archived by an administrator.",
+                'category-archived' => "The category \"{$name}\" is currently unavailable. Your saved progress is safe.",
                 'category-restored' => "The category \"{$name}\" has been restored to the roadmap!",
                 'category-added' => "A new category \"{$name}\" has been added to the curriculum!",
-                'story-archived' => "The story chapter \"{$name}\" was archived by an administrator.",
+                'story-archived' => "The story chapter \"{$name}\" is currently unavailable. Your saved progress is safe.",
                 'story-restored' => "The story chapter \"{$name}\" has been restored to adventures!",
                 'story-added' => "A new story chapter \"{$name}\" has been added! Embark on a new FSL adventure.",
-                'platform-maintenance' => ($event['name'] ?: ((($event['id'] ?? 0) === 1) ? 'Signia is currently undergoing routine curriculum updates. Practice will resume shortly.' : 'Platform maintenance has concluded. All learning systems are fully operational!')),
+                'platform-maintenance' => ($event['name'] ?: ((($event['id'] ?? 0) === 1) ? 'We are updating Signia. Some lessons may be unavailable for a short time. Please try again soon.' : 'The updates are finished. You can continue learning now!')),
                 default => "Curriculum update: {$name}",
             };
 
@@ -162,7 +162,7 @@ class PlayerNotificationController extends Controller
                 'category' => 'curriculum',
                 'title' => $title,
                 'message' => $message,
-                'reason' => $event['reason'] ?? null,
+                'reason' => $type === 'platform-maintenance' ? null : ($event['reason'] ?? null),
                 'type' => $uiType,
                 'timestamp' => $eventTimestamp,
                 'link' => $link,

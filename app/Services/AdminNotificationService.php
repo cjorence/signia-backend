@@ -6,6 +6,7 @@ use App\Models\AdminNotification;
 use App\Models\AdminNotificationSetting;
 use App\Models\Purchase;
 use App\Models\User;
+use App\Support\DisplayName;
 use Illuminate\Support\Facades\DB;
 
 class AdminNotificationService
@@ -71,11 +72,12 @@ class AdminNotificationService
         $amount = number_format((float) ($purchase->amount ?? 0), 2);
         $currency = strtoupper((string) ($purchase->currency ?: 'PHP'));
         $packageKey = $purchase->package_key ?? $purchase->product_name ?? 'Heart Refill Package';
+        $packageName = DisplayName::package($packageKey);
 
         return AdminNotification::create([
             'type' => 'heart_purchase',
             'title' => 'Hearts Store Purchase',
-            'message' => "{$userName} purchased {$packageKey} for {$currency} {$amount}.",
+            'message' => "{$userName} purchased {$packageName} for {$currency} {$amount}.",
             'data' => [
                 'purchase_id' => $purchase->id,
                 'user_id' => $user?->id,
@@ -124,6 +126,13 @@ class AdminNotificationService
     public function getNotifications(int $limit = 50): array
     {
         $notifications = AdminNotification::recent()->take($limit)->get();
+        // Format existing alerts too, without changing their read state or history.
+        foreach ($notifications as $notification) {
+            $key = $notification->data['package_key'] ?? null;
+            if ($notification->type === 'heart_purchase' && is_string($key) && $key !== '') {
+                $notification->message = str_replace('purchased '.$key.' for ', 'purchased '.DisplayName::package($key).' for ', $notification->message);
+            }
+        }
         $unreadCount = AdminNotification::unread()->count();
 
         return [
