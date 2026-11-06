@@ -77,6 +77,28 @@ class RecognitionSecurityTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_sign_clip_is_admin_only_and_forwards_the_selected_category(): void
+    {
+        config(['recognition.url' => 'http://recognition.internal']);
+        Http::fake(['recognition.internal/*' => Http::response(['prediction' => 'BLUE', 'confidence' => .91])]);
+        $route = '/api/admin/recognition/sign-clip';
+        $clip = ['mode' => 'color', 'frames' => array_fill(0, 30, array_fill(0, 126, .12))];
+        $this->postJson($route, $clip)->assertUnauthorized();
+        $this->actingAs(User::factory()->create(['role' => 'user', 'is_active' => true]))->postJson($route, $clip)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'is_active' => true]));
+        $this->postJson($route, array_replace($clip, ['mode' => '../predict']))->assertUnprocessable();
+        $this->postJson($route, array_replace($clip, ['frames' => []]))->assertUnprocessable();
+        $bad = $clip;
+        $bad['frames'][0][0] = '0.12';
+        $this->postJson($route, $bad)->assertUnprocessable();
+        $bad['frames'][0][0] = 5;
+        $this->postJson($route, $bad)->assertUnprocessable();
+        Http::assertNothingSent();
+        $this->postJson($route, $clip + ['stream_id' => 'player-stream'])->assertOk()->assertJsonPath('prediction', 'BLUE');
+        Http::assertSent(fn ($request) => $request->url() === 'http://recognition.internal/predict/admin-sign-clip'
+            && $request->data() === $clip);
+    }
+
     public function test_admin_gateway_has_an_explicit_endpoint_allowlist(): void
     {
         Http::fake(['*' => Http::response(['status' => 'success'])]);
