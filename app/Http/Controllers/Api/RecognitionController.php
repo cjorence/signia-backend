@@ -30,16 +30,29 @@ class RecognitionController extends Controller
 
     public function greetingClip(Request $request)
     {
+        return $this->forwardClip($request, 'predict/greeting-clip');
+    }
+
+    public function signClip(Request $request)
+    {
+        $data = $request->validate([
+            'mode' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/'],
+        ]);
+        return $this->forwardClip($request, 'predict/admin-sign-clip', ['mode' => strtolower($data['mode'])]);
+    }
+
+    private function forwardClip(Request $request, string $path, array $data = [])
+    {
         if (strlen($request->getContent()) > 131072) {
-            return response()->json(['message' => 'Greeting recording too large.'], 413);
+            return response()->json(['message' => 'Sign recording too large.'], 413);
         }
         $frames = $request->json('frames');
         if (! is_array($frames) || ! array_is_list($frames) || count($frames) !== 30) {
-            return response()->json(['message' => 'Expected 30 greeting samples.'], 422);
+            return response()->json(['message' => 'Expected 30 sign samples.'], 422);
         }
         foreach ($frames as $frame) {
             if (! is_array($frame) || ! array_is_list($frame) || count($frame) !== 126) {
-                return response()->json(['message' => 'Invalid greeting sample.'], 422);
+                return response()->json(['message' => 'Invalid sign sample.'], 422);
             }
             foreach ($frame as $value) {
                 if ((! is_int($value) && ! is_float($value)) || ! is_finite($value) || abs($value) > 4) {
@@ -47,7 +60,7 @@ class RecognitionController extends Controller
                 }
             }
         }
-        return $this->forward('predict/greeting-clip', 'POST', ['frames' => $frames]);
+        return $this->forward($path, 'POST', $data + ['frames' => $frames]);
     }
 
     public function admin(Request $request, string $path)
@@ -140,6 +153,7 @@ class RecognitionController extends Controller
 
         if ($path === 'models' && $upstream->successful()) {
             $payload['admin_greeting_clip'] = ($payload['greeting_clip'] ?? false) === true;
+            $payload['admin_sign_clip_modes'] = $payload['admin_sign_clip_modes'] ?? [];
         }
         if ($path === 'api/train/capabilities' && $upstream->successful()) {
             $payload['training_enabled'] = config('recognition.training_enabled') === true
