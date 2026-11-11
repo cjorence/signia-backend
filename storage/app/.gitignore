@@ -3,4 +3,5 @@
 !public/
 !stories/
 !stories/**
+stories/chapter_*.pck
 !.gitignore
