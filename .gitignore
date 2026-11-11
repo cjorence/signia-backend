@@ -20,6 +20,7 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/stories/chapter_*.pck
 /vendor
 Homestead.json
 Homestead.yaml

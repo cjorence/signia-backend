@@ -44,12 +44,16 @@ class StoryService
             $status = $isCompleted ? 'complete' : ($isUnlocked ? 'continue' : 'locked');
 
             $progressRecord = $userProgressByStory[$story->id] ?? null;
-            $percent = $isCompleted ? 100 : (int) ($progressRecord?->progress_percent ?? 0);
             $totalSteps = (int) ($progressRecord?->total_steps ?? ($story->episodes ?? 1));
             if ($totalSteps <= 0) {
                 $totalSteps = max(1, (int) ($story->episodes ?? 1));
             }
             $currentStep = $isCompleted ? $totalSteps : (int) ($progressRecord?->current_step ?? 0);
+            $percent = $isCompleted
+                ? 100
+                : ($currentStep > 0
+                    ? min(99, max(0, (int) round(($currentStep / $totalSteps) * 100)))
+                    : (int) ($progressRecord?->progress_percent ?? 0));
 
             $progressData = [
                 'percent' => $percent,
@@ -144,8 +148,8 @@ class StoryService
             $totalSteps = max(1, (int) ($data['total_steps'] ?? 1));
             $saveState = isset($data['save_state']) && is_array($data['save_state']) ? $data['save_state'] : null;
 
-            $percent = min(100, max(0, (int) floor(($currentStep / $totalSteps) * 100)));
             $isComplete = $currentStep >= $totalSteps || ($data['status'] ?? '') === 'completed';
+            $percent = $isComplete ? 100 : min(99, max(0, (int) round(($currentStep / $totalSteps) * 100)));
 
             // A delayed request or replay must not erase a completed chapter.
             $progress = $existing?->status === 'completed' ? $existing : UserStoryProgress::updateOrCreate(

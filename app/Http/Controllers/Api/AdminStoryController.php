@@ -44,7 +44,7 @@ class AdminStoryController extends Controller
             'package_file' => ['nullable', 'file', 'max:102400'], // max 100MB
         ]);
 
-        $maxChapter = Story::withTrashed()->max('chapter_number') ?? 0;
+        $maxChapter = Story::max('chapter_number') ?? 0;
         $chapterNumber = ! empty($validated['chapter_number']) ? (int) $validated['chapter_number'] : $maxChapter + 1;
         $order = ! empty($validated['order']) ? (int) $validated['order'] : $chapterNumber;
 
@@ -76,6 +76,7 @@ class AdminStoryController extends Controller
             }
             $filename = 'chapter_'.$chapterNumber.'_'.time().'.pck';
             $file->move($dir, $filename);
+            $this->patchStoryPackage($dir.DIRECTORY_SEPARATOR.$filename);
             $fileName = $filename;
         }
 
@@ -204,6 +205,7 @@ class AdminStoryController extends Controller
             }
             $filename = 'chapter_'.$story->chapter_number.'_'.time().'.pck';
             $file->move($dir, $filename);
+            $this->patchStoryPackage($dir.DIRECTORY_SEPARATOR.$filename);
             $story->file_name = $filename;
         }
 
@@ -458,6 +460,73 @@ class AdminStoryController extends Controller
             'count' => count($deletedIds),
             'deleted_ids' => $deletedIds,
         ], 200);
+    }
+
+    protected function patchStoryPackage(string $pckPath): void
+    {
+        if (! is_file($pckPath) || filesize($pckPath) < 65536) {
+            return;
+        }
+
+        $fp = @fopen($pckPath, 'rb');
+        if (! $fp) {
+            return;
+        }
+        $magic = fread($fp, 4);
+        fclose($fp);
+        if ($magic !== 'GDPC') {
+            return;
+        }
+
+        $patchDir = storage_path('app/stories/patches');
+        $gdreExe = base_path('../.deployment-tools/story-resume-20261030/tools/gdre_tools.exe');
+        if (! is_dir($patchDir) || ! is_file($gdreExe)) {
+            return;
+        }
+
+        $patches = [
+            'player.gdc' => 'res://Player/Scripts/player.gdc',
+            'DialogueManager.gdc' => 'res://Scripts/DialogueManager.gdc',
+            'LevelManager.gdc' => 'res://Scripts/LevelManager.gdc',
+            'SaveManager.gdc' => 'res://Scripts/SaveManager.gdc',
+            'chapter_finished_ui.gdc' => 'res://Scripts/chapter_finished_ui.gdc',
+            'choice_box.gdc' => 'res://Scripts/choice_box.gdc',
+            'pause_menu.gdc' => 'res://Scripts/pause_menu.gdc',
+            'user_input.gdc' => 'res://Scripts/user_input.gdc',
+            's1_p1.json' => 'res://dialogues/s1_p1.json',
+        ];
+
+        $tmpOutput = $pckPath.'.patched.pck';
+        $cmd = [
+            $gdreExe,
+            '--headless',
+            '--pck-patch='.str_replace('\\', '/', $pckPath),
+            '--output='.str_replace('\\', '/', $tmpOutput),
+        ];
+
+        foreach ($patches as $localFile => $resTarget) {
+            $localPath = $patchDir.DIRECTORY_SEPARATOR.$localFile;
+            if (is_file($localPath)) {
+                $cmd[] = '--patch-file='.str_replace('\\', '/', $localPath).'='.$resTarget;
+            }
+        }
+
+        $env = array_merge($_ENV, [
+            'APPDATA' => base_path('../.deployment-tools/story-resume-20261030/tool-userdata'),
+        ]);
+
+        try {
+            \Illuminate\Support\Facades\Process::env($env)->timeout(60)->run($cmd);
+            if (is_file($tmpOutput) && filesize($tmpOutput) > 65536) {
+                @rename($tmpOutput, $pckPath);
+            } elseif (is_file($tmpOutput)) {
+                @unlink($tmpOutput);
+            }
+        } catch (\Throwable) {
+            if (is_file($tmpOutput)) {
+                @unlink($tmpOutput);
+            }
+        }
     }
 }
 
