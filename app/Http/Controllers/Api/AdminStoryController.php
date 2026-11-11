@@ -40,7 +40,7 @@ class AdminStoryController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:100'],
             'required_lesson_ids' => ['nullable'],
-            'cover_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'cover_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,jfif,png,webp', 'max:10240'],
             'package_file' => ['nullable', 'file', 'max:102400'], // max 100MB
         ]);
 
@@ -138,7 +138,7 @@ class AdminStoryController extends Controller
             'icon' => ['nullable', 'string', 'max:50'],
             'color' => ['nullable', 'string', 'max:100'],
             'required_lesson_ids' => ['nullable'],
-            'cover_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'cover_photo' => ['nullable', 'file', 'mimes:jpg,jpeg,jfif,png,webp', 'max:10240'],
             'package_file' => ['nullable', 'file', 'max:102400'],
         ]);
 
