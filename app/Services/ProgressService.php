@@ -237,20 +237,9 @@ class ProgressService
 
         $profile->total_xp = ($profile->total_xp ?? 0) + $xpReward;
 
-        // Level thresholds are admin-managed data and are never changed during play.
-        $highestLevel = Level::where('required_xp', '<=', $profile->total_xp)
-            ->where(function ($query) {
-                $query->where('order', 1)
-                    ->orWhere('required_xp', '>', 0);
-            })
-            ->orderBy('required_xp', 'desc')
-            ->orderBy('order', 'desc')
-            ->first();
-
-        if ($highestLevel) {
-            $newLevel = $highestLevel->order ?: $highestLevel->id;
-            $profile->current_level = max($profile->current_level ?? 1, $newLevel);
-        }
+        // Player level advances every 100 XP (0–99 XP = Lv 1, 100–199 XP = Lv 2, etc.)
+        $calculatedLevel = intdiv(max(0, (int) $profile->total_xp), 100) + 1;
+        $profile->current_level = max(1, $calculatedLevel);
 
         $profile->save();
 
