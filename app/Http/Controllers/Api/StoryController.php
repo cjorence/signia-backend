@@ -96,7 +96,8 @@ class StoryController extends Controller
             'current_step' => ['required', 'integer', 'min:0', 'max:2147483647', 'lte:total_steps'],
             'total_steps' => ['required', 'integer', 'min:1', 'max:2147483647'],
             'save_state' => ['nullable', 'array'],
-            'status' => ['nullable', 'string', 'in:in_progress,completed'],
+            'status' => ['nullable', 'string', 'in:not_started,in_progress,completed'],
+            'reset' => ['nullable', 'boolean'],
         ]);
 
         $result = $this->storyService->updateStoryProgress($user, $story, $validated);

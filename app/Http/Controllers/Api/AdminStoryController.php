@@ -477,56 +477,6 @@ class AdminStoryController extends Controller
         if ($magic !== 'GDPC') {
             return;
         }
-
-        $patchDir = storage_path('app/stories/patches');
-        $gdreExe = base_path('../.deployment-tools/story-resume-20261030/tools/gdre_tools.exe');
-        if (! is_dir($patchDir) || ! is_file($gdreExe)) {
-            return;
-        }
-
-        $patches = [
-            'player.gdc' => 'res://Player/Scripts/player.gdc',
-            'DialogueManager.gdc' => 'res://Scripts/DialogueManager.gdc',
-            'LevelManager.gdc' => 'res://Scripts/LevelManager.gdc',
-            'SaveManager.gdc' => 'res://Scripts/SaveManager.gdc',
-            'chapter_finished_ui.gdc' => 'res://Scripts/chapter_finished_ui.gdc',
-            'choice_box.gdc' => 'res://Scripts/choice_box.gdc',
-            'pause_menu.gdc' => 'res://Scripts/pause_menu.gdc',
-            'user_input.gdc' => 'res://Scripts/user_input.gdc',
-            's1_p1.json' => 'res://dialogues/s1_p1.json',
-        ];
-
-        $tmpOutput = $pckPath.'.patched.pck';
-        $cmd = [
-            $gdreExe,
-            '--headless',
-            '--pck-patch='.str_replace('\\', '/', $pckPath),
-            '--output='.str_replace('\\', '/', $tmpOutput),
-        ];
-
-        foreach ($patches as $localFile => $resTarget) {
-            $localPath = $patchDir.DIRECTORY_SEPARATOR.$localFile;
-            if (is_file($localPath)) {
-                $cmd[] = '--patch-file='.str_replace('\\', '/', $localPath).'='.$resTarget;
-            }
-        }
-
-        $env = array_merge($_ENV, [
-            'APPDATA' => base_path('../.deployment-tools/story-resume-20261030/tool-userdata'),
-        ]);
-
-        try {
-            \Illuminate\Support\Facades\Process::env($env)->timeout(60)->run($cmd);
-            if (is_file($tmpOutput) && filesize($tmpOutput) > 65536) {
-                @rename($tmpOutput, $pckPath);
-            } elseif (is_file($tmpOutput)) {
-                @unlink($tmpOutput);
-            }
-        } catch (\Throwable) {
-            if (is_file($tmpOutput)) {
-                @unlink($tmpOutput);
-            }
-        }
     }
 }
 
