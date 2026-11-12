@@ -74,7 +74,23 @@ class RecognitionSecurityTest extends TestCase
         $this->actingAs(User::factory()->create(['is_active' => true]));
         $this->postJson('/api/recognition/predict', array_replace($this->frame(), ['image' => '<script>']))->assertUnprocessable();
         $this->postJson('/api/recognition/predict', array_replace($this->frame(), ['image' => str_repeat('x', 2000001)]))->assertUnprocessable();
+        $this->postJson('/api/recognition/predict', ['mode' => 'greeting', 'stream_id' => 'same-browser-id'])->assertUnprocessable();
+        $this->postJson('/api/recognition/predict', ['mode' => 'greeting', 'stream_id' => 'same-browser-id', 'landmarks' => [0.5]])->assertUnprocessable();
         Http::assertNothingSent();
+    }
+
+    public function test_predict_forwards_client_landmark_fast_path_without_image(): void
+    {
+        config(['recognition.url' => 'http://recognition.internal']);
+        Http::fake(['recognition.internal/*' => Http::response(['prediction' => 'HELLO', 'confidence' => 0.94])]);
+        $this->actingAs(User::factory()->create(['is_active' => true]));
+        $payload = [
+            'mode' => 'greeting',
+            'stream_id' => 'same-browser-id',
+            'frames' => array_fill(0, 8, array_fill(0, 126, 0.15)),
+            'landmarks_126' => array_fill(0, 126, 0.15),
+        ];
+        $this->postJson('/api/recognition/predict', $payload)->assertOk()->assertJsonPath('prediction', 'HELLO');
     }
 
     public function test_sign_clip_is_admin_only_and_forwards_the_selected_category(): void

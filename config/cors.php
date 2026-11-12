@@ -37,7 +37,7 @@ return [
 
     'exposed_headers' => ['X-Request-ID'],
 
-    'max_age' => 0,
+    'max_age' => 86400,
 
     // This application authenticates with explicit Bearer tokens, not cross-origin cookies.
     'supports_credentials' => false,
