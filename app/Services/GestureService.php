@@ -17,19 +17,16 @@ class GestureService
     private const CORRECTNESS_THRESHOLD = 70.00;
 
     public function __construct(
-        protected ProgressService $progressService,
-        protected HeartService $heartService
+        protected ProgressService $progressService
     ) {}
 
     /**
      * Compare expected vs predicted, calculate correctness, store log,
-     * deduct heart if incorrect, and trigger progress update.
+     * and trigger progress update.
      */
     public function storeGesture(int $userId, array $data): array
     {
-        $user = User::findOrFail($userId);
-
-        $this->heartService->ensureCanAttempt($user);
+        User::findOrFail($userId);
 
         $sign = Sign::findOrFail($data['sign_id']);
         if ((int) $sign->level_id !== (int) $data['level_id']) {
@@ -49,18 +46,8 @@ class GestureService
         // 2. Confidence must meet threshold
         $isCorrect = ($expected === $predicted) && ($confidence >= self::CORRECTNESS_THRESHOLD);
 
-        // Persist log + heart deduction + progress update atomically
-        $result = DB::transaction(function () use ($user, $userId, $data, $sign, $expected, $isCorrect, $confidence) {
-
-            if (! $isCorrect) {
-                $this->heartService->deduct($user, 1, 'failed_gesture_attempt', [
-                    'sign_id' => $data['sign_id'],
-                    'level_id' => $data['level_id'],
-                    'expected_sign' => $expected,
-                    'predicted_sign' => $data['predicted_sign'],
-                    'confidence' => $confidence,
-                ]);
-            }
+        // Persist log + progress update atomically
+        $result = DB::transaction(function () use ($userId, $data, $sign, $expected, $isCorrect, $confidence) {
 
             // 1. Store the gesture log
             $log = GestureLog::create([

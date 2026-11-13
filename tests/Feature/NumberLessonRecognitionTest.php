@@ -24,6 +24,6 @@ class NumberLessonRecognitionTest extends TestCase
         $this->assertEquals(5, $profile->fresh()->hearts);
         $wrong = $service->storeGesture($user->id, $data + ['predicted_sign' => 'TEN']);
         $this->assertFalse($wrong['is_correct']);
-        $this->assertEquals(4, $profile->fresh()->hearts);
+        $this->assertEquals(5, $profile->fresh()->hearts);
     }
 }
