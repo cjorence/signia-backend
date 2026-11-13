@@ -147,11 +147,47 @@ class StoryService
             $currentStep = (int) ($data['current_step'] ?? 0);
             $totalSteps = max(1, (int) ($data['total_steps'] ?? 1));
             $saveState = isset($data['save_state']) && is_array($data['save_state']) ? $data['save_state'] : null;
+            $isReset = (bool) ($data['reset'] ?? false)
+                || ($data['status'] ?? '') === 'not_started'
+                || (is_array($saveState) && ! empty($saveState['is_restart']));
+
+            if ($isReset) {
+                $progress = UserStoryProgress::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'story_id' => $story->id,
+                    ],
+                    [
+                        'status' => 'in_progress',
+                        'progress_percent' => 0,
+                        'current_step' => 0,
+                        'total_steps' => $totalSteps,
+                        'save_state' => null,
+                        'completed_at' => null,
+                        'last_played_at' => now(),
+                    ]
+                );
+
+                return [
+                    'success' => true,
+                    'story_id' => $story->id,
+                    'chapter_number' => $story->chapter_number,
+                    'status' => 'not_started',
+                    'progress_percent' => 0,
+                    'current_step' => 0,
+                    'total_steps' => $totalSteps,
+                    'save_state' => null,
+                ];
+            }
 
             $isComplete = $currentStep >= $totalSteps || ($data['status'] ?? '') === 'completed';
             $percent = $isComplete ? 100 : min(99, max(0, (int) round(($currentStep / $totalSteps) * 100)));
 
-            // A delayed request or replay must not erase a completed chapter.
+            if (! $isComplete && is_array($saveState) && is_array($existing?->save_state)) {
+                $saveState = array_merge($existing->save_state, $saveState);
+            }
+
+            // A delayed request must not erase a completed chapter unless explicitly reset above.
             $progress = $existing?->status === 'completed' ? $existing : UserStoryProgress::updateOrCreate(
                 [
                     'user_id' => $user->id,
@@ -162,7 +198,7 @@ class StoryService
                     'progress_percent' => $isComplete ? 100 : $percent,
                     'current_step' => $isComplete ? $totalSteps : $currentStep,
                     'total_steps' => $totalSteps,
-                    'save_state' => $saveState,
+                    'save_state' => $isComplete ? null : $saveState,
                     'completed_at' => $isComplete ? now() : null,
                     'last_played_at' => now(),
                 ]
@@ -205,6 +241,7 @@ class StoryService
                     'progress_percent' => 100,
                     'current_step' => $totalSteps,
                     'total_steps' => $totalSteps,
+                    'save_state' => null,
                     'completed_at' => $existing?->completed_at ?? now(),
                     'last_played_at' => now(),
                 ]

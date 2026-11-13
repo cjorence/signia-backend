@@ -65,7 +65,7 @@ Route::get('/platform/maintenance', [AdminController::class, 'getMaintenance']);
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
-    Route::post('/recognition/predict', [\App\Http\Controllers\Api\RecognitionController::class, 'predict'])->middleware('throttle:300,1,recognition-predict');
+    Route::post('/recognition/predict', [\App\Http\Controllers\Api\RecognitionController::class, 'predict'])->middleware('throttle:900,1,recognition-predict');
 
     // Auth
     Route::prefix('auth')->group(function () {

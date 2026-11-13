@@ -15,17 +15,52 @@ class RecognitionController extends Controller
         $data = $request->validate([
             'mode' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/'],
             'model_label' => ['sometimes', 'string', 'max:80'],
-            'image' => ['required', 'string', 'max:2000000'],
+            'image' => ['sometimes', 'nullable', 'string', 'max:2000000'],
+            'landmarks' => ['sometimes', 'array'],
+            'landmarks_126' => ['sometimes', 'array', 'size:126'],
+            'frames' => ['sometimes', 'array', 'min:1', 'max:30'],
+            'hand_detected' => ['sometimes', 'boolean'],
             'stream_id' => ['required', 'string', 'max:100'],
             'stabilize' => ['sometimes', 'boolean'],
         ]);
-        if (! str_starts_with($data['image'], 'data:image/jpeg;base64,') && ! str_starts_with($data['image'], 'data:image/png;base64,')) {
+        $hasImage = isset($data['image']) && is_string($data['image']) && $data['image'] !== '';
+        $hasLandmarks = isset($data['landmarks']) || isset($data['landmarks_126']) || isset($data['frames']) || array_key_exists('hand_detected', $data);
+        if (! $hasImage && ! $hasLandmarks) {
+            return response()->json(['message' => 'A camera frame or hand landmarks are required.'], 422);
+        }
+        if ($hasImage && ! str_starts_with($data['image'], 'data:image/jpeg;base64,') && ! str_starts_with($data['image'], 'data:image/png;base64,')) {
             return response()->json(['message' => 'A JPEG or PNG camera frame is required.'], 422);
+        }
+        if (isset($data['landmarks']) && (! array_is_list($data['landmarks']) || ! in_array(count($data['landmarks']), [63, 126], true) || ! $this->validLandmarkNumbers($data['landmarks']))) {
+            return response()->json(['message' => 'Invalid hand landmarks.'], 422);
+        }
+        if (isset($data['landmarks_126']) && (! array_is_list($data['landmarks_126']) || ! $this->validLandmarkNumbers($data['landmarks_126']))) {
+            return response()->json(['message' => 'Invalid hand landmarks.'], 422);
+        }
+        if (isset($data['frames'])) {
+            if (! array_is_list($data['frames'])) {
+                return response()->json(['message' => 'Invalid sign sample.'], 422);
+            }
+            foreach ($data['frames'] as $frame) {
+                if (! is_array($frame) || ! array_is_list($frame) || count($frame) !== 126 || ! $this->validLandmarkNumbers($frame)) {
+                    return response()->json(['message' => 'Invalid hand landmarks.'], 422);
+                }
+            }
         }
         // A caller cannot choose another account's namespace or access the server camera.
         $data['stream_id'] = hash_hmac('sha256', $request->user()->id.':'.$data['stream_id'], config('app.key'));
         $data['frame_source'] = 'client';
         return $this->forward('predict', 'POST', $data);
+    }
+
+    private function validLandmarkNumbers(array $values): bool
+    {
+        foreach ($values as $value) {
+            if ((! is_int($value) && ! is_float($value)) || ! is_finite($value) || abs($value) > 4) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public function greetingClip(Request $request)
