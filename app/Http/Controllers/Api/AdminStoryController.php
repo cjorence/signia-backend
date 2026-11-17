@@ -232,11 +232,14 @@ class AdminStoryController extends Controller
         ], 200);
     }
 
-    public function archive(Request $request, Story $story): JsonResponse
+    public function archive(Request $request, int $id): JsonResponse
     {
-        $reason = $request->input('reason');
-        $story->delete();
-        CurriculumEventService::record('story-archived', $story->id, $story->title, $reason);
+        $story = Story::withTrashed()->findOrFail($id);
+        if (! $story->trashed()) {
+            $reason = $request->input('reason');
+            $story->delete();
+            CurriculumEventService::record('story-archived', $story->id, $story->title, $reason);
+        }
 
         return response()->json([
             'success' => true,
