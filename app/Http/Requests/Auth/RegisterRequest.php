@@ -16,7 +16,7 @@ class RegisterRequest extends FormRequest
     {
         return [
             ...\App\Support\LegalAgreement::rules(),
-            'name'     => ['required', 'string', 'max:255'],
+            'name'     => ['required', 'string', 'min:2', 'max:40', 'regex:/^[\p{L}\p{N} .\'-]+$/u'],
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers(), 'confirmed'],
             'code'     => ['sometimes', 'nullable', 'string'],
@@ -27,6 +27,9 @@ class RegisterRequest extends FormRequest
     {
         return [
             'name.required'      => 'Name is required.',
+            'name.min'           => 'Display name must be at least 2 characters.',
+            'name.max'           => 'Display name must be 40 characters or fewer.',
+            'name.regex'         => 'Display name cannot contain emojis or unsupported symbols.',
             'terms_accepted.required' => 'Please agree to the Terms of Service.',
             'terms_accepted.accepted' => 'Please agree to the Terms of Service.',
             'privacy_acknowledged.required' => 'Please acknowledge the Privacy Notice.',
