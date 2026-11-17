@@ -224,7 +224,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/stories/bulk-archive', [AdminStoryController::class, 'bulkArchive'])->middleware('audit:Archived story chapter');
         Route::post('/stories/bulk-restore', [AdminStoryController::class, 'bulkRestore'])->middleware('audit:Restored story chapter');
         Route::post('/stories/bulk-force-delete', [AdminStoryController::class, 'bulkForceDestroy'])->middleware('audit:Permanently deleted story chapter');
-        Route::post('/stories/{story}/archive', [AdminStoryController::class, 'archive'])->middleware('audit:Archived story chapter');
+        Route::post('/stories/{id}/archive', [AdminStoryController::class, 'archive'])->middleware('audit:Archived story chapter');
         Route::post('/stories/{id}/restore', [AdminStoryController::class, 'restore'])->middleware('audit:Restored story chapter');
         Route::delete('/stories/{id}/force', [AdminStoryController::class, 'forceDestroy'])->middleware('audit:Permanently deleted story chapter');
         Route::get('/stories', [AdminStoryController::class, 'index']);

@@ -30,8 +30,12 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'email'           => ['required', 'string', 'email', 'max:255'],
-            'name'            => ['sometimes', 'nullable', 'string', 'max:255'],
+            'name'            => ['sometimes', 'nullable', 'string', 'min:2', 'max:40', 'regex:/^[\p{L}\p{N} .\'-]+$/u'],
             'turnstile_token' => ['sometimes', 'nullable', 'string'],
+        ], [
+            'name.min'   => 'Display name must be at least 2 characters.',
+            'name.max'   => 'Display name must be 40 characters or fewer.',
+            'name.regex' => 'Display name cannot contain emojis or unsupported symbols.',
         ]);
 
         $email = strtolower(trim($validated['email']));
@@ -591,7 +595,7 @@ class AuthController extends Controller
         $user = auth()->user();
 
         $rules = [
-            'name'     => ['sometimes', 'string', 'max:255'],
+            'name'     => ['sometimes', 'string', 'min:2', 'max:40', 'regex:/^[\p{L}\p{N} .\'-]+$/u'],
             'avatar'   => ['sometimes', 'nullable', 'string', 'max:500'],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
         ];
@@ -604,6 +608,9 @@ class AuthController extends Controller
         }
 
         $messages = [
+            'name.min'       => 'Display name must be at least 2 characters.',
+            'name.max'       => 'Display name must be 40 characters or fewer.',
+            'name.regex'     => 'Display name cannot contain emojis or unsupported symbols.',
             'password.min'   => 'The new password must be at least 8 characters.',
             'password.regex' => 'The password must contain at least one uppercase letter, one lowercase letter, and a number.',
             'current_password.required_with' => 'Please enter your current password.',

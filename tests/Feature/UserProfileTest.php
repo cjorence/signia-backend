@@ -86,4 +86,24 @@ class UserProfileTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['current_password']);
     }
+
+    public function test_display_name_rejects_emojis_and_invalid_lengths(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/user/profile', ['name' => 'Juan 😀'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/user/profile', ['name' => 'A'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/user/profile', ['name' => str_repeat('A', 41)])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+    }
 }
