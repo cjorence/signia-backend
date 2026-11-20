@@ -144,8 +144,20 @@ class PurchaseService
     {
         $this->expireStalePendingPurchases();
 
+        $paidRevenue = (float) Purchase::where('status', 'paid')->sum('amount');
+
+        // Include retained fees from partially refunded orders (e.g., 20% processing fee when 80% is refunded).
+        $retainedFromRefunds = (float) Purchase::query()
+            ->where('purchases.status', 'refunded')
+            ->join('refund_requests', function ($join) {
+                $join->on('refund_requests.purchase_id', '=', 'purchases.id')
+                    ->where('refund_requests.status', '=', 'refunded');
+            })
+            ->selectRaw('COALESCE(SUM(CASE WHEN purchases.amount > refund_requests.amount THEN purchases.amount - refund_requests.amount ELSE 0 END), 0) as retained')
+            ->value('retained');
+
         return [
-            'total_revenue' => (float) Purchase::where('status', 'paid')->sum('amount'),
+            'total_revenue' => round($paidRevenue + $retainedFromRefunds, 2),
             'paid_purchases' => Purchase::where('status', 'paid')->count(),
             'pending_purchases' => Purchase::where('status', 'pending')->count(),
             'failed_purchases' => Purchase::where('status', 'failed')->count(),
