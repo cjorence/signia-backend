@@ -497,5 +497,74 @@ class RefundSystemTest extends TestCase
 
         $this->assertEquals(39.20, (float) $refundRequest->fresh()->amount);
         $this->assertEquals('ref_partial_123', $refundRequest->fresh()->paymongo_refund_id);
+
+        // Revenue should deduct only the refunded 39.20 and retain the 20% fee (9.80)
+        $summaryResponse = $this->getJson('/api/admin/revenue/summary');
+        $summaryResponse->assertStatus(200)
+            ->assertJsonPath('data.total_revenue', 9.8)
+            ->assertJsonPath('data.refunded_purchases', 1);
+    }
+
+    public function test_full_refund_deducts_entire_purchase_from_revenue(): void
+    {
+        $this->configurePayMongo();
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create(['role' => 'user', 'email' => 'fullrefund@signia.test']);
+
+        $purchase = Purchase::create([
+            'user_id' => $user->id,
+            'product_type' => 'heart',
+            'package_key' => 'small_hearts',
+            'quantity' => 5,
+            'amount' => 49.00,
+            'currency' => 'PHP',
+            'status' => 'paid',
+            'provider' => 'paymongo',
+            'paid_at' => now(),
+        ]);
+
+        PaymentTransaction::create([
+            'purchase_id' => $purchase->id,
+            'provider' => 'paymongo',
+            'provider_reference' => 'cs_test_full',
+            'status' => 'paid',
+            'amount' => 49.00,
+            'currency' => 'PHP',
+            'raw_payload' => ['data' => ['attributes' => ['payments' => [['id' => 'pay_test_full']]]]],
+            'processed_at' => now(),
+        ]);
+
+        $refundRequest = RefundRequest::create([
+            'user_id' => $user->id,
+            'purchase_id' => $purchase->id,
+            'reason' => 'accidental_duplicate',
+            'amount' => 49.00,
+            'currency' => 'PHP',
+            'status' => 'pending',
+        ]);
+
+        Http::fake([
+            'https://api.paymongo.test/v1/refunds' => Http::response([
+                'data' => [
+                    'id' => 'ref_full_123',
+                    'type' => 'refund',
+                    'attributes' => ['amount' => 4900, 'status' => 'succeeded'],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->postJson("/api/admin/refund-requests/{$refundRequest->id}/approve", [
+            'approved_amount' => 49.00,
+            'admin_notes' => 'Full 100% refund approved.',
+        ])->assertStatus(200);
+
+        $summaryResponse = $this->getJson('/api/admin/revenue/summary');
+        $summaryResponse->assertStatus(200)
+            ->assertJsonPath('data.total_revenue', 0)
+            ->assertJsonPath('data.refunded_purchases', 1);
     }
 }
